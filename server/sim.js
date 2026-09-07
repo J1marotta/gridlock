@@ -2,7 +2,7 @@
 // Reads the tune object every tick, so the admin panel (~) changes the live game.
 import {
   WORLD_H, WORLD_W,
-  buildTrack, closestOnTrack, gateAt, gridSlot, inPitBox, inPitZone, pointAhead,
+  buildTrack, closestOnTrack, gateAt, gridSlot, inPitBox, inPitZone, pitBoxFor, pointAhead,
 } from '../src/game/track.js'
 import { cloneTune } from '../src/game/tune.js'
 
@@ -33,8 +33,8 @@ export function angDiff(a, b) {
   return d
 }
 
-export function createRace(tune = cloneTune()) {
-  const track = buildTrack()
+export function createRace(tune = cloneTune(), trackOverride = null) {
+  const track = trackOverride ?? buildTrack()
   return {
     tune, track,
     phase: 'lobby', // lobby | countdown | racing | finished
@@ -63,7 +63,7 @@ export function logEvent(race, kind, text, seat = -1) {
 }
 
 export function addCar(race, { playerId, name, color, isNpc, seat }) {
-  const slot = gridSlot(seat)
+  const slot = gridSlot(race.track, seat)
   const info = closestOnTrack(race.track, slot.x, slot.y)
   const car = {
     seat, playerId, name, color, isNpc: Boolean(isNpc),
@@ -194,7 +194,7 @@ function stepCar(race, car, dt) {
     if (car.pitState === 'crew') {
       car.pitNeedleT += dt * tune.pit.needleSpeed
       if (now >= car.pitAutoAt) resolvePit(race, car, 'slow', true)
-      else if (!inPitBox(car.seat, car.x, car.y)) {
+      else if (!inPitBox(race.track, car.seat, car.x, car.y)) {
         car.pitState = 'none'
         logEvent(race, 'pit', `${car.name} jumped the crew — no change!`, car.seat)
       }
@@ -258,7 +258,7 @@ function stepCar(race, car, dt) {
   car.vy = ndy * vf + vly
 
   // pit speed limit
-  if (inPitZone(car.x, car.y)) {
+  if (inPitZone(race.track, car.x, car.y)) {
     const sp = Math.hypot(car.vx, car.vy)
     if (sp > tune.pit.speedLimit) {
       const k = tune.pit.speedLimit / sp
@@ -275,7 +275,7 @@ function stepCar(race, car, dt) {
   // walls: push back inside, scrub outward velocity
   const w = closestOnTrack(race.track, car.x, car.y)
   const maxD = race.track.halfWidth + 14
-  if (w.dist > maxD && !inPitZone(car.x, car.y)) {
+  if (w.dist > maxD && !inPitZone(race.track, car.x, car.y)) {
     const nx = (car.x - w.px) / (w.dist || 1)
     const ny = (car.y - w.py) / (w.dist || 1)
     car.x = w.px + nx * maxD
@@ -320,7 +320,7 @@ function stepCar(race, car, dt) {
   }
 
   // pit boxes: stop inside yours and the crew runs out (once per visit)
-  if (car.pitState === 'none' && car.pitArmed && inPitBox(car.seat, car.x, car.y)) {
+  if (car.pitState === 'none' && car.pitArmed && inPitBox(race.track, car.seat, car.x, car.y)) {
     if (Math.hypot(car.vx, car.vy) < 30) {
       car.pitHoldMs += dt * 1000
       if (car.pitHoldMs >= tune.pit.boxHoldMs) {
@@ -334,7 +334,7 @@ function stepCar(race, car, dt) {
     }
   } else if (car.pitState === 'none') {
     car.pitHoldMs = 0
-    if (!inPitBox(car.seat, car.x, car.y)) car.pitArmed = true
+    if (!inPitBox(race.track, car.seat, car.x, car.y)) car.pitArmed = true
   }
 }
 
@@ -430,16 +430,16 @@ export function aiInput(race, car) {
   let tx, ty
   let creep = false
   if (car.wear > 82) {
-    const box = { x: 300 + car.seat * 55, y: 832 }
+    const box = pitBoxFor(race.track, car.seat)
     const dBox = Math.hypot(box.x - car.x, box.y - car.y)
-    if (dBox < 500 || inPitZone(car.x, car.y)) {
+    if (dBox < 500 || inPitZone(race.track, car.x, car.y)) {
       tx = box.x
       ty = box.y
       creep = dBox < 60
     }
   }
   if (tx === undefined) {
-    if (inPitZone(car.x, car.y)) {
+    if (inPitZone(race.track, car.x, car.y)) {
       // just serviced (or cut through): rejoin at the pit exit, don't u-turn into the wall
       tx = 1060
       ty = 740

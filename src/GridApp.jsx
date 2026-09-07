@@ -7,6 +7,7 @@ import { renderRace } from './game/raceCanvas.js'
 import { GridAudio } from './game/audio.js'
 import { LocalRace } from './game/localRace.js'
 import AdminPanel from './game/AdminPanel.jsx'
+import TrackStudio from './game/TrackStudio.jsx'
 
 const ITEM_GLYPH = { boost: '🚀', oil: '🛢', crate: '📦', shield: '🛡', zap: '⚡' }
 
@@ -251,8 +252,24 @@ export default function GridApp() {
 
   function soloRematch() {
     const t = localTuneRef.current ?? cloneTune()
-    localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: t })
+    const custom = localRef.current?.customTrack ?? null
+    localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: t, trackData: custom })
     localRef.current.start()
+    setScreen('countdown')
+  }
+
+  function testDrive(trackData) {
+    audioRef.current.ensure()
+    localStorage.setItem('gridlock-name', name)
+    const t = localTuneRef.current ?? cloneTune()
+    localTuneRef.current = t
+    localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: t, trackData })
+    localRef.current.customTrack = trackData
+    localRef.current.start()
+    keysRef.current = { up: false, down: false, left: false, right: false }
+    lastInputSent.current = ''
+    setMode('local')
+    setError('')
     setScreen('countdown')
   }
 
@@ -302,6 +319,7 @@ export default function GridApp() {
                 <button className="nitro-btn primary" disabled={busy} onClick={doJoin}>JOIN A RACE</button>
                 <button className="nitro-btn" disabled={busy} onClick={doCreate}>HOST A RACE</button>
                 <button className="nitro-btn go" onClick={startSolo}>SOLO TEST (VS CPU)</button>
+                <button className="nitro-btn" onClick={() => setScreen('studio')}>🎨 TRACK STUDIO</button>
               </div>
               <p className="dim small">
                 ↑ gas · ↓ brake · ← → steer · Space item / pit timing · <kbd>~</kbd> live tune panel.
@@ -341,9 +359,16 @@ export default function GridApp() {
           </div>
         )}
 
+        {screen === 'studio' && (
+          <TrackStudio onTestDrive={testDrive} onExit={() => setScreen('menu')} />
+        )}
+
         {(screen === 'countdown' || screen === 'racing' || screen === 'finished') && view && (
           <>
-            <RaceCanvas view={view} audio={audioRef.current} mySeat={mySeat} />
+            <RaceCanvas
+              view={view} audio={audioRef.current} mySeat={mySeat}
+              track={mode === 'local' && localRef.current ? localRef.current.race.track : undefined}
+            />
             {screen === 'finished' && (
               <div className="grid-card" ref={resultRef}>
                 <div className="winner-banner">🏁 {view.winnerName} WINS 🏁</div>
@@ -417,16 +442,18 @@ function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, inRoom
   )
 }
 
-function RaceCanvas({ view, audio, mySeat }) {
+function RaceCanvas({ view, audio, mySeat, track }) {
   const canvasRef = useRef(null)
   const viewRef = useRef(view)
   viewRef.current = view
+  const trackRef = useRef(track)
+  trackRef.current = track
   useEffect(() => {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     let raf = 0
     const loop = () => {
-      renderRace(ctx, canvas.width, canvas.height, viewRef.current, performance.now())
+      renderRace(ctx, canvas.width, canvas.height, viewRef.current, performance.now(), trackRef.current)
       const local = viewRef.current?.cars.find(c => c.seat === (viewRef.current?.localSeat ?? mySeat))
       if (local) {
         audio.engine(local.speed, viewRef.current.phase === 'racing')

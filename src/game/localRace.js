@@ -1,14 +1,18 @@
 // Solo mode: the authoritative sim running locally. Same physics, bots, pits,
 // items and live tune as multiplayer — no server needed.
 import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from '../../server/sim.js'
+import { trackFromData } from './track.js'
 import { cloneTune } from './tune.js'
 
 const BOT_NAMES = ['Vex', 'Turbo', 'Skidz', 'Octane', 'Drifty', 'Nitro', 'Sparks', 'Axel', 'Gear', 'Ruby', 'Max']
 
 export class LocalRace {
-  constructor({ playerName = 'Racer', tune = null } = {}) {
+  constructor({ playerName = 'Racer', tune = null, trackData = null } = {}) {
     this.tune = tune ?? cloneTune()
-    this.race = createRace(this.tune)
+    const custom = trackData ? trackFromData(trackData) : null
+    if (trackData && !custom.ok) throw new Error(custom.error)
+    this.trackName = trackData?.name ?? 'Riverside Park'
+    this.race = createRace(this.tune, custom ? custom.track : null)
     addCar(this.race, { playerId: 'you', name: playerName, color: SEAT_COLORS[0], isNpc: false, seat: 0 })
     for (let seat = 1; seat < 12; seat += 1) {
       addCar(this.race, {

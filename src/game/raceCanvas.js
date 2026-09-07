@@ -1,13 +1,19 @@
-import { HALF_WIDTH, PIT, START_LINE_X, WORLD_H, WORLD_W, buildDecor, buildTrack, pitBox } from './track.js'
+import { HALF_WIDTH, WORLD_H, WORLD_W, buildDecor, buildTrack, pitBoxFor } from './track.js'
 import { SEAT_COLORS } from '../../server/sim.js'
 
 const TRACK = buildTrack()
 const DECOR = buildDecor(TRACK, 7)
+const decorCache = new WeakMap()
+export function decorFor(track) {
+  if (!track || track === TRACK) return DECOR
+  if (!decorCache.has(track)) decorCache.set(track, buildDecor(track, 99))
+  return decorCache.get(track)
+}
 
 const ITEM_GLYPH = { boost: '🚀', oil: '🛢', crate: '📦', shield: '🛡', zap: '⚡' }
 export const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL', crate: 'CRATE', shield: 'SHIELD', zap: 'ZAP' }
 
-export function renderRace(ctx, W, H, view, nowMs) {
+export function renderRace(ctx, W, H, view, nowMs, track = TRACK) {
   const s = Math.min(W / WORLD_W, H / WORLD_H)
   const ox = (W - WORLD_W * s) / 2
   const oy = (H - WORLD_H * s) / 2
@@ -16,10 +22,10 @@ export function renderRace(ctx, W, H, view, nowMs) {
   ctx.fillRect(0, 0, W, H)
   ctx.translate(ox, oy)
   ctx.scale(s, s)
-  drawGround(ctx, DECOR)
-  drawTrack(ctx, TRACK.points)
-  drawPit(ctx)
-  drawBoxes(ctx, view, nowMs)
+  drawGround(ctx, decorFor(track))
+  drawTrack(ctx, track)
+  drawPit(ctx, track)
+  drawBoxes(ctx, view, track, nowMs)
   drawHazards(ctx, view)
   drawVans(ctx, view, nowMs)
   const cars = [...(view?.cars ?? [])].sort((a, b) => (b.finished ? 1 : 0) - (a.finished ? 1 : 0))
@@ -69,7 +75,8 @@ function drawGround(ctx, decor) {
   }
 }
 
-function drawTrack(ctx, pts) {
+function drawTrack(ctx, track) {
+  const pts = track.points
   const w = HALF_WIDTH * 2
   // white base, red dashed curb, asphalt, center dashes
   trackPath(ctx, pts)
@@ -94,14 +101,17 @@ function drawTrack(ctx, pts) {
   ctx.setLineDash([24, 30])
   ctx.stroke()
   ctx.setLineDash([])
-  // start/finish checker across the straight
-  const sx = START_LINE_X
+  // start/finish checker across the track at the start point
+  ctx.save()
+  ctx.translate(track.start.x, track.start.y)
+  ctx.rotate(track.start.angle)
   for (let r = 0; r < 2; r += 1) {
     for (let i = 0; i < 10; i += 1) {
       ctx.fillStyle = (r + i) % 2 ? '#111' : '#fff'
-      ctx.fillRect(sx - 8 + r * 8, 748 - HALF_WIDTH + i * ((HALF_WIDTH * 2) / 10), 8, (HALF_WIDTH * 2) / 10)
+      ctx.fillRect(r * 8 - 8, -HALF_WIDTH + i * ((HALF_WIDTH * 2) / 10), 8, (HALF_WIDTH * 2) / 10)
     }
   }
+  ctx.restore()
 }
 
 export function trackPath(ctx, points) {
@@ -111,18 +121,19 @@ export function trackPath(ctx, points) {
   ctx.closePath()
 }
 
-function drawPit(ctx) {
+function drawPit(ctx, track) {
+  const pit = track.pit
   ctx.fillStyle = '#55555f'
-  ctx.fillRect(PIT.x0, PIT.y0, PIT.x1 - PIT.x0, PIT.y1 - PIT.y0)
+  ctx.fillRect(pit.x0, pit.y0, pit.x1 - pit.x0, pit.y1 - pit.y0)
   ctx.strokeStyle = '#ffd23f'
   ctx.lineWidth = 3
-  ctx.strokeRect(PIT.x0, PIT.y0, PIT.x1 - PIT.x0, PIT.y1 - PIT.y0)
+  ctx.strokeRect(pit.x0, pit.y0, pit.x1 - pit.x0, pit.y1 - pit.y0)
   ctx.fillStyle = '#9be9ff'
   ctx.font = 'bold 16px monospace'
   ctx.textAlign = 'center'
-  ctx.fillText('PIT LANE — STOP IN YOUR BOX', (PIT.x0 + PIT.x1) / 2, PIT.y0 + 20)
+  ctx.fillText('PIT LANE — STOP IN YOUR BOX', (pit.x0 + pit.x1) / 2, pit.y0 + 20)
   for (let i = 0; i < 12; i += 1) {
-    const b = pitBox(i)
+    const b = pitBoxFor(track, i)
     ctx.strokeStyle = 'rgba(255,255,255,0.5)'
     ctx.lineWidth = 2
     ctx.strokeRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h)
@@ -132,9 +143,9 @@ function drawPit(ctx) {
   }
 }
 
-function drawBoxes(ctx, view, nowMs) {
+function drawBoxes(ctx, view, track, nowMs) {
   for (const b of view?.boxes ?? []) {
-    const pos = TRACK.boxes[b.idx]
+    const pos = track.boxes[b.idx]
     if (!pos) continue
     ctx.save()
     ctx.translate(pos.x, pos.y)

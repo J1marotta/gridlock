@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   HALF_WIDTH, WORLD_H, WORLD_W,
-  buildDecor, buildTrack, closestOnTrack, gateAt, gridSlot, inPitBox, inPitZone, pitBox, pointAhead,
+  buildDecor, buildTrack, closestOnTrack, gateAt, gridSlot, inPitBox, inPitZone, pitBoxFor, pointAhead,
 } from './track.js'
 
 describe('riverside park', () => {
@@ -52,20 +52,22 @@ describe('riverside park', () => {
     expect(c.along).toBeLessThan(100)
   })
 
-  it('grid slots sit behind the start line on the straight', () => {
+  it('grid slots sit on the ribbon behind the start', () => {
     for (let i = 0; i < 12; i += 1) {
-      const s = gridSlot(i)
-      expect(s.x).toBeLessThan(300)
-      expect(Math.abs(s.y - 748)).toBeLessThan(HALF_WIDTH)
+      const s = gridSlot(track, i)
+      expect(closestOnTrack(track, s.x, s.y).dist).toBeLessThan(HALF_WIDTH)
+      // within 300m of the wrap on either reading (shared start vertex)
+      const along = closestOnTrack(track, s.x, s.y).along
+      expect(along > track.total - 600 || along < 300).toBe(true)
     }
   })
 
   it('pit boxes live inside the pit zone', () => {
-    expect(inPitZone(500, 832)).toBe(true)
-    expect(inPitZone(500, 748)).toBe(false)
+    expect(inPitZone(track, 500, 832)).toBe(true)
+    expect(inPitZone(track, 500, 748)).toBe(false)
     for (let i = 0; i < 12; i += 1) {
-      const b = pitBox(i)
-      expect(inPitBox(i, b.x, b.y)).toBe(true)
+      const b = pitBoxFor(track, i)
+      expect(inPitBox(track, i, b.x, b.y)).toBe(true)
     }
   })
 

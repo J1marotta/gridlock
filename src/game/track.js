@@ -2,6 +2,9 @@
 // World is 1600x900. Cars drive the loop counter-clockwise starting east
 // along the bottom straight: sweeper, S-curves, climb, top straight,
 // hairpin, drop, infield twist, home straight.
+//
+// Tracks are DATA (see makeTrack): the paint studio builds custom ones with
+// the same shape, so the sim, renderer and pits work on any loop.
 export const WORLD_W = 1600
 export const WORLD_H = 900
 export const HALF_WIDTH = 46
@@ -19,43 +22,87 @@ const CENTER = [
   [880, 700], [700, 730], [520, 745], [360, 748],
 ]
 
-export const START_LINE_X = 300
-export const START_ANGLE = 0 // east
-
-export function gridSlot(i) {
-  const row = Math.floor(i / 2)
-  const side = i % 2 === 0 ? -1 : 1
-  return { x: 250 - row * 48, y: 748 + side * 26, angle: START_ANGLE }
-}
-
-export const PIT = { x0: 170, x1: 1030, y0: 792, y1: 872 }
-export function pitBox(seat) {
-  return { x: 300 + seat * 55, y: 832, w: 44, h: 60 }
-}
-
-// Item boxes sit on the racing surface: straight, S exit, top, hairpin exit, drop, infield.
-const BOX_SPOTS = [3, 8, 13, 16, 20, 24]
+const DEFAULT_PIT = { x0: 170, x1: 1030, y0: 792, y1: 872 }
+const DEFAULT_BOX_SPOTS = [3, 8, 13, 16, 20, 24]
 
 function segLen(a, b) {
   return Math.hypot(b[0] - a[0], b[1] - a[1])
 }
 
-export function buildTrack() {
-  const points = CENTER.map(p => [...p])
-  const n = points.length
+// Full track object from a raw loop. Options override the auto-derived bits.
+export function makeTrack(points, opts = {}) {
+  const pts = points.map(p => [...p])
+  const n = pts.length
   const cum = [0]
   for (let i = 0; i < n; i += 1) {
     cum.push(cum[i] + segLen(points[i], points[(i + 1) % n]))
   }
   const total = cum[n]
+  const halfWidth = opts.halfWidth ?? HALF_WIDTH
+  const start = opts.start ?? {
+    x: pts[0][0],
+    y: pts[0][1],
+    angle: Math.atan2(pts[1][1] - pts[0][1], pts[1][0] - pts[0][0]),
+  }
+  const pit = opts.pit ?? { ...DEFAULT_PIT }
+  const pitBoxes = opts.pitBoxes ?? Array.from({ length: 12 }, (_, i) => ({ x: 300 + i * 55, y: 832 }))
+  const boxes = opts.boxes ?? DEFAULT_BOX_SPOTS.map(idx => ({ x: pts[idx % n][0], y: pts[idx % n][1] }))
+  return { points: pts, cum, total, halfWidth, gateCount: GATE_COUNT, boxes, pit, pitBoxes, start }
+}
+
+export function buildTrack() {
+  return makeTrack(CENTER)
+}
+
+// Rebuild a track from studio JSON. Returns { ok, track?, error? }.
+export function trackFromData(data) {
+  if (!data || !Array.isArray(data.points) || data.points.length < 8) {
+    return { ok: false, error: 'Need at least 8 loop points' }
+  }
+  for (const p of data.points) {
+    if (!Array.isArray(p) || p.length !== 2 || !p.every(Number.isFinite)) {
+      return { ok: false, error: 'Points must be [x, y] pairs' }
+    }
+  }
+  const halfWidth = data.halfWidth ?? HALF_WIDTH
+  if (!(halfWidth >= 24 && halfWidth <= 90)) return { ok: false, error: 'Width out of range' }
+  return { ok: true, track: makeTrack(data.points, data) }
+}
+
+export function gridSlot(track, i) {
+  // Slots ride the ribbon itself, staggered behind the start line, so every
+  // seat starts on asphalt no matter the loop shape.
+  const row = Math.floor(i / 2)
+  const side = i % 2 === 0 ? -1 : 1
+  const back = 50 + row * 48
+  const c = pointAhead(track, track.total - back, 0)
+  const ahead = pointAhead(track, track.total - back + 5, 0)
+  const dx = ahead.x - c.x, dy = ahead.y - c.y
+  const len = Math.hypot(dx, dy) || 1
   return {
-    points, cum, total, halfWidth: HALF_WIDTH, gateCount: GATE_COUNT,
-    boxes: BOX_SPOTS.map(idx => ({ x: points[idx][0], y: points[idx][1] })),
+    x: c.x + (-dy / len) * side * 26,
+    y: c.y + (dx / len) * side * 26,
+    angle: Math.atan2(dy, dx),
   }
 }
 
+export function pitBoxFor(track, seat) {
+  const b = track.pitBoxes[seat % track.pitBoxes.length]
+  return { x: b.x, y: b.y, w: 44, h: 60 }
+}
+
+export function inPitZone(track, x, y) {
+  const p = track.pit
+  return x >= p.x0 && x <= p.x1 && y >= p.y0 && y <= p.y1
+}
+
+export function inPitBox(track, seat, x, y) {
+  const b = pitBoxFor(track, seat)
+  return Math.abs(x - b.x) < b.w / 2 && Math.abs(y - b.y) < b.h / 2
+}
+
 // Closest point on the loop. Returns distance, cumulative along-distance,
-// segment index and the outward push vector.
+// segment index and the closest point.
 export function closestOnTrack(track, x, y) {
   const { points, cum } = track
   const n = points.length
@@ -95,15 +142,6 @@ export function pointAhead(track, along, aheadDist) {
   return { x: points[0][0], y: points[0][1] }
 }
 
-export function inPitZone(x, y) {
-  return x >= PIT.x0 && x <= PIT.x1 && y >= PIT.y0 && y <= PIT.y1
-}
-
-export function inPitBox(seat, x, y) {
-  const b = pitBox(seat)
-  return Math.abs(x - b.x) < b.w / 2 && Math.abs(y - b.y) < b.h / 2
-}
-
 // Seeded decor that stays clear of the racing surface.
 export function mulberry(seed) {
   let s = seed >>> 0
@@ -126,7 +164,7 @@ export function buildDecor(track, seed = 7) {
     const x = 40 + rnd() * (WORLD_W - 80)
     const y = 40 + rnd() * (WORLD_H - 80)
     if (closestOnTrack(track, x, y).dist < 95) continue
-    if (inPitZone(x, y)) continue
+    if (inPitZone(track, x, y)) continue
     trees.push({ x, y, s: 8 + rnd() * 10 })
   }
   const houseSpots = [[150, 560], [1370, 130], [420, 420], [1500, 700], [650, 130]]

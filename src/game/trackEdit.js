@@ -1,0 +1,217 @@
+// Paint-studio geometry: turn a freehand brush stroke into a raceable loop.
+// The brush paints a CENTERLINE; the ribbon preview shows the track width.
+// finalizeTrack() produces the JSON that makeTrack()/test-drive consumes.
+import { WORLD_H, WORLD_W, makeTrack } from './track.js'
+
+const dist2 = (a, b) => {
+  const dx = a[0] - b[0], dy = a[1] - b[1]
+  return dx * dx + dy * dy
+}
+
+// Chaikin corner-cutting on a closed loop. Kills brush jitter, keeps shape.
+export function smoothClosed(points, iterations = 2) {
+  let pts = points.map(p => [...p])
+  for (let k = 0; k < iterations; k += 1) {
+    const out = []
+    for (let i = 0; i < pts.length; i += 1) {
+      const a = pts[i]
+      const b = pts[(i + 1) % pts.length]
+      out.push([a[0] * 0.75 + b[0] * 0.25, a[1] * 0.75 + b[1] * 0.25])
+      out.push([a[0] * 0.25 + b[0] * 0.75, a[1] * 0.25 + b[1] * 0.75])
+    }
+    pts = out
+  }
+  return pts
+}
+
+export function rawLength(points) {
+  let total = 0
+  for (let i = 0; i < points.length; i += 1) {
+    total += Math.sqrt(dist2(points[i], points[(i + 1) % points.length]))
+  }
+  return total
+}
+
+// Evenly spaced points every `step` px around the closed loop.
+export function resampleClosed(points, step = 18) {
+  const total = rawLength(points)
+  const count = Math.max(8, Math.round(total / step))
+  const out = []
+  let acc = 0
+  let target = 0
+  const n = points.length
+  for (let i = 0; i < n; i += 1) {
+    const a = points[i]
+    const b = points[(i + 1) % n]
+    const len = Math.sqrt(dist2(a, b)) || 0.0001
+    while (target <= acc + len && out.length < count) {
+      const t = (target - acc) / len
+      out.push([a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t])
+      target += total / count
+    }
+    acc += len
+  }
+  while (out.length < count) out.push([...points[0]])
+  return out.slice(0, count)
+}
+
+// Distance between segments p1-p2 and p3-p4.
+export function segSegDist(p1, p2, p3, p4) {
+  const d1x = p2[0] - p1[0], d1y = p2[1] - p1[1]
+  const d2x = p4[0] - p3[0], d2y = p4[1] - p3[1]
+  const rxs = d1x * d2y - d1y * d2x
+  if (Math.abs(rxs) < 1e-9) {
+    // parallel: min endpoint distance
+    return Math.sqrt(Math.min(
+      dist2(p1, p3), dist2(p1, p4), dist2(p2, p3), dist2(p2, p4),
+    ))
+  }
+  const qpx = p1[0] - p3[0], qpy = p1[1] - p3[1]
+  const t = (qpx * d2y - qpy * d2x) / rxs
+  const u = (qpx * d1y - qpy * d1x) / rxs
+  if (t >= 0 && t <= 1 && u >= 0 && u <= 1) return 0
+  const ptSeg = (p, a, b) => {
+    const abx = b[0] - a[0], aby = b[1] - a[1]
+    const t2 = Math.min(1, Math.max(0, ((p[0] - a[0]) * abx + (p[1] - a[1]) * aby) / ((abx * abx + aby * aby) || 1)))
+    return Math.hypot(p[0] - (a[0] + abx * t2), p[1] - (a[1] + abx * t2))
+  }
+  return Math.min(ptSeg(p1, p3, p4), ptSeg(p2, p3, p4), ptSeg(p3, p1, p2), ptSeg(p4, p1, p2))
+}
+
+// Segment pairs that are close in space but far apart along the loop —
+// genuine overlaps, not tight bends (those are close in arclength too).
+export function findPinches(points, halfWidth) {
+  const n = points.length
+  const cum = [0]
+  for (let i = 0; i < n; i += 1) {
+    const a = points[i], b = points[(i + 1) % n]
+    cum.push(cum[i] + Math.hypot(b[0] - a[0], b[1] - a[1]))
+  }
+  const total = cum[n] || 1
+  const arcDist = (a, b) => {
+    const d = Math.abs(a - b) % total
+    return Math.min(d, total - d)
+  }
+  const pinches = []
+  for (let i = 0; i < n; i += 1) {
+    for (let j = i + 2; j < n; j += 1) {
+      if (i === 0 && j === n - 1) continue // closing pair is adjacent
+      // nearest arclength gap between any endpoints (wrap-aware)
+      let sep = Infinity
+      for (const a of [cum[i] % total, cum[i + 1] % total]) {
+        for (const b of [cum[j] % total, cum[j + 1] % total]) {
+          sep = Math.min(sep, arcDist(a, b))
+        }
+      }
+      if (sep < total * 0.2) continue
+      const a = points[i], b = points[(i + 1) % n]
+      const c = points[j], d = points[(j + 1) % n]
+      if (segSegDist(a, b, c, d) < halfWidth * 2 + 12) {
+        pinches.push({ segA: i, segB: j, x: (a[0] + c[0]) / 2, y: (a[1] + c[1]) / 2 })
+        if (pinches.length > 8) return pinches
+      }
+    }
+  }
+  return pinches
+}
+
+function clearanceAt(points, halfWidth, x, y) {
+  let best = Infinity
+  for (let i = 0; i < points.length; i += 1) {
+    const a = points[i], b = points[(i + 1) % points.length]
+    const abx = b[0] - a[0], aby = b[1] - a[1]
+    const t = Math.min(1, Math.max(0, ((x - a[0]) * abx + (y - a[1]) * aby) / ((abx * abx + aby * aby) || 1)))
+    best = Math.min(best, Math.hypot(x - (a[0] + abx * t), y - (a[1] + aby * t)))
+  }
+  return best - halfWidth
+}
+
+// Pit lane alongside the longest straight, on whichever side has room.
+export function autoPit(points, halfWidth, seatCount = 12) {
+  let best = { len: -1, i: 0 }
+  for (let i = 0; i < points.length; i += 1) {
+    const len = Math.sqrt(dist2(points[i], points[(i + 1) % points.length]))
+    if (len > best.len) best = { len, i }
+  }
+  const a = points[best.i]
+  const b = points[(best.i + 1) % points.length]
+  const dx = (b[0] - a[0]) / (best.len || 1)
+  const dy = (b[1] - a[1]) / (best.len || 1)
+  const mx = (a[0] + b[0]) / 2
+  const my = (a[1] + b[1]) / 2
+  const off = halfWidth + 52
+  const cands = [
+    { x: mx - dy * off, y: my + dx * off },
+    { x: mx + dy * off, y: my - dx * off },
+  ]
+  const scored = cands.map(c => ({ ...c, clear: clearanceAt(points, halfWidth, c.x, c.y) }))
+  scored.sort((p, q) => q.clear - p.clear)
+  const chosen = scored[0]
+  const laneLen = Math.min(860, best.len + 500)
+  const warnings = []
+  if (chosen.clear < 24) warnings.push('Pit lane is close to the track — expect chaos')
+  // lane rect expanded along the straight direction
+  const ex = dx * laneLen / 2, ey = dy * laneLen / 2
+  const x0 = Math.min(chosen.x - ex, chosen.x + ex) - 40
+  const x1 = Math.max(chosen.x - ex, chosen.x + ex) + 40
+  const y0 = Math.min(chosen.y - ey, chosen.y + ey) - 40
+  const y1 = Math.max(chosen.y - ey, chosen.y + ey) + 40
+  const pitBoxes = Array.from({ length: seatCount }, (_, i) => ({
+    x: chosen.x - dx * ((seatCount - 1) * 55) / 2 + dx * i * 55,
+    y: chosen.y - dy * ((seatCount - 1) * 55) / 2 + dy * i * 55,
+  }))
+  return { pit: { x0, y0, x1, y1 }, pitBoxes, warnings }
+}
+
+export function validateLoop(points, halfWidth) {
+  const errors = []
+  const warnings = []
+  if (points.length < 8) errors.push('Keep painting — need a longer stroke')
+  const total = rawLength(points)
+  if (total < 1000) errors.push('Loop is too short (min ~1000px)')
+  for (const [x, y] of points) {
+    if (x < 20 || x > WORLD_W - 20 || y < 20 || y > WORLD_H - 20) {
+      errors.push('Stay inside the park bounds')
+      break
+    }
+  }
+  const pinches = findPinches(points, halfWidth)
+  if (pinches.length) warnings.push(`${pinches.length} tight spot${pinches.length > 1 ? 's' : ''} where the ribbon nearly touches — racing line may jump`)
+  return { errors, warnings, total, pinches }
+}
+
+// Raw brush stroke -> raceable track JSON (or errors).
+export function finalizeTrack(raw, opts = {}) {
+  const halfWidth = opts.halfWidth ?? 46
+  const smoothed = smoothClosed(raw, 2)
+  const pts = resampleClosed(smoothed, 18)
+  const check = validateLoop(pts, halfWidth)
+  if (check.errors.length) return { ok: false, errors: check.errors, warnings: check.warnings }
+  const track = makeTrack(pts, { halfWidth })
+  const boxes = []
+  for (let k = 0; k < 6; k += 1) {
+    const a = (track.total * (k + 0.5)) / 6
+    let acc = 0
+    for (let i = 0; i < pts.length; i += 1) {
+      const p = pts[i], q = pts[(i + 1) % pts.length]
+      const len = Math.hypot(q[0] - p[0], q[1] - p[1])
+      if (a >= acc && a <= acc + len) {
+        const t = len ? (a - acc) / len : 0
+        boxes.push({ x: p[0] + (q[0] - p[0]) * t, y: p[1] + (q[1] - p[1]) * t })
+        break
+      }
+      acc += len
+    }
+  }
+  const { pit, pitBoxes, warnings: pitWarnings } = autoPit(pts, halfWidth)
+  const data = {
+    name: opts.name || 'Custom Loop',
+    points: pts.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]),
+    halfWidth,
+    pit,
+    pitBoxes: pitBoxes.map(b => ({ x: Math.round(b.x), y: Math.round(b.y) })),
+    boxes,
+    start: track.start,
+  }
+  return { ok: true, data, warnings: [...check.warnings, ...pitWarnings], total: track.total }
+}

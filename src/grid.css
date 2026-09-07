@@ -65,6 +65,14 @@
 .race-feed .zap { color: #ffee33; } .race-feed .spin { color: #ff9f1c; }
 .race-feed .pit { color: #33ccff; } .race-feed .traffic { color: #c26bff; }
 
+/* ---- track studio ---- */
+.studio-wrap { display: flex; justify-content: center; }
+.studio-canvas {
+  border: 3px solid #ffd23f; border-radius: 10px;
+  cursor: crosshair; touch-action: none;
+  max-width: 100%; height: auto; background: #1d5c2e;
+}
+
 /* ---- admin panel ---- */
 .admin-overlay {
   position: fixed; inset: 0; z-index: 50;
