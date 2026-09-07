@@ -2,9 +2,12 @@ import { Client } from '@colyseus/sdk'
 import { CLIENT_MESSAGE_TYPES, PROTOCOL_VERSION, SERVER_MESSAGE_TYPES } from './protocol.js'
 
 export const DEFAULT_COLYSEUS_ENDPOINT = 'ws://127.0.0.1:2567'
+export const PRODUCTION_COLYSEUS_ENDPOINT = 'wss://gridlock-racer.fly.dev'
 
 export function getColyseusEndpoint() {
-  return import.meta.env.VITE_COLYSEUS_URL || DEFAULT_COLYSEUS_ENDPOINT
+  return import.meta.env.VITE_COLYSEUS_URL || (import.meta.env.PROD
+    ? PRODUCTION_COLYSEUS_ENDPOINT
+    : DEFAULT_COLYSEUS_ENDPOINT)
 }
 
 export class ColyseusTransport {

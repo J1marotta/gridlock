@@ -10,7 +10,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "dev:colyseus": "node --watch server/index.js",
-    "start:colyseus": "node server/index.js"
+    "start:colyseus": "node server/index.js",
+    "smoke:fly": "node server/remoteSmoke.js",
+    "deploy:cloudflare": "npm run build && wrangler pages deploy dist"
   },
   "dependencies": {
     "@colyseus/core": "^0.17.42",
