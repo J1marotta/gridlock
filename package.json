@@ -1,0 +1,31 @@
+{
+  "name": "gridlock",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "test": "vitest run --environment node server src/game/tune.test.js src/game/track.test.js src/game/localRace.test.js src/multiplayer/protocol.test.js",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "dev:colyseus": "node --watch server/index.js",
+    "start:colyseus": "node server/index.js"
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.17.42",
+    "@colyseus/schema": "^4.0.27",
+    "@colyseus/sdk": "^0.17.43",
+    "@colyseus/ws-transport": "^0.17.13",
+    "express": "^5.2.1",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.3",
+    "jsdom": "^29.1.1",
+    "oxlint": "^1.71.0",
+    "vite": "^8.1.1",
+    "vitest": "^4.1.10"
+  }
+}

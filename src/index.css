@@ -1,0 +1,10 @@
+:root { color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body, #root { height: 100%; margin: 0; }
+body {
+  background: #0b0714;
+  color: #eaf2ff;
+  font-family: 'Courier New', ui-monospace, monospace;
+  overflow-x: hidden;
+}
+button, input, select { font-family: inherit; }
