@@ -10,8 +10,8 @@ export function decorFor(track) {
   return decorCache.get(track)
 }
 
-const ITEM_GLYPH = { boost: '🚀', oil: '🛢', crate: '📦', shield: '🛡', zap: '⚡' }
-export const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL', crate: 'CRATE', shield: 'SHIELD', zap: 'ZAP' }
+const ITEM_GLYPH = { boost: '🚀', oil: '🛢' }
+export const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL' }
 
 export function renderRace(ctx, W, H, view, nowMs, track = TRACK) {
   const s = Math.min(W / WORLD_W, H / WORLD_H)
@@ -24,16 +24,16 @@ export function renderRace(ctx, W, H, view, nowMs, track = TRACK) {
   ctx.scale(s, s)
   drawGround(ctx, decorFor(track))
   drawTrack(ctx, track)
-  drawPit(ctx, track)
+  drawPit(ctx, track, nowMs)
   drawBoxes(ctx, view, track, nowMs)
-  drawHazards(ctx, view)
+  drawHazards(ctx, view, nowMs)
   // depth: ground traffic, bridge decks, then bridge traffic on top
   drawVans(ctx, view, nowMs, false)
   const cars = [...(view?.cars ?? [])].sort((a, b) => (b.finished ? 1 : 0) - (a.finished ? 1 : 0))
-  for (const car of cars) if ((car.level ?? 0) <= 0) drawCar(ctx, view, car, nowMs)
+  for (const car of cars) if ((car.level ?? 0) <= 0) drawCar(ctx, view, track, car, nowMs)
   drawBridges(ctx, track)
   drawVans(ctx, view, nowMs, true)
-  for (const car of cars) if ((car.level ?? 0) > 0) drawCar(ctx, view, car, nowMs)
+  for (const car of cars) if ((car.level ?? 0) > 0) drawCar(ctx, view, track, car, nowMs)
   ctx.restore()
   renderOverlays(ctx, W, H, view, nowMs)
 }
@@ -220,9 +220,10 @@ export function trackPath(ctx, points) {
   ctx.closePath()
 }
 
-function drawPit(ctx, track) {
-  // Oriented lane along the track. Two rows of generous slots — anyone
-  // stopped anywhere in the lane gets serviced, no assigned boxes.
+function drawPit(ctx, track, nowMs) {
+  // Oriented lane along the track. Anyone stopped anywhere in it gets
+  // serviced — no assigned boxes. Marching-ants border + entry chevrons
+  // so nobody can miss it.
   const pit = track.pit
   ctx.save()
   ctx.translate(pit.cx, pit.cy)
@@ -231,8 +232,11 @@ function drawPit(ctx, track) {
   ctx.fillStyle = '#55555f'
   ctx.fillRect(-L / 2, -Wd / 2, L, Wd)
   ctx.strokeStyle = '#ffd23f'
-  ctx.lineWidth = 3
+  ctx.lineWidth = 4
+  ctx.setLineDash([18, 12])
+  ctx.lineDashOffset = -(nowMs / 40)
   ctx.strokeRect(-L / 2, -Wd / 2, L, Wd)
+  ctx.setLineDash([])
   ctx.strokeStyle = 'rgba(255,255,255,0.5)'
   ctx.lineWidth = 2
   for (let row = 0; row < 2; row += 1) {
@@ -243,9 +247,21 @@ function drawPit(ctx, track) {
     }
   }
   ctx.fillStyle = '#9be9ff'
-  ctx.font = 'bold 18px monospace'
+  ctx.font = 'bold 22px monospace'
   ctx.textAlign = 'center'
-  ctx.fillText('PIT — STOP ANYWHERE', 0, -Wd / 2 + 24)
+  ctx.fillText('PIT — STOP ANYWHERE', 0, -Wd / 2 + 28)
+  // entry chevrons at the lane mouth (track direction = +x here)
+  const slide = (nowMs / 300) % 1
+  ctx.fillStyle = '#22ff66'
+  for (let i = 0; i < 3; i += 1) {
+    const t = (slide + i / 3) % 1
+    const x = -L / 2 - 90 + t * 80
+    const s = 10 + t * 8
+    ctx.beginPath()
+    ctx.moveTo(x - s, -s * 0.7); ctx.lineTo(x + s * 0.4, 0); ctx.lineTo(x - s, s * 0.7)
+    ctx.lineTo(x - s * 0.2, 0)
+    ctx.closePath(); ctx.fill()
+  }
   ctx.restore()
 }
 
@@ -279,29 +295,31 @@ function drawBoxes(ctx, view, track, nowMs) {
   }
 }
 
-function drawHazards(ctx, view) {
+function drawHazards(ctx, view, nowMs) {
   for (const hz of view?.hazards ?? []) {
     ctx.save()
     ctx.translate(hz.x, hz.y)
     if (hz.kind === 'oil') {
-      ctx.fillStyle = 'rgba(10,10,14,0.9)'
+      // big glossy slick with a shimmer sweep — impossible to miss
+      const pulse = 0.75 + 0.25 * Math.sin(nowMs / 240)
+      ctx.globalAlpha = pulse
+      ctx.fillStyle = '#0a0a10'
       ctx.beginPath()
-      ctx.ellipse(0, 0, 15, 10, 0.4, 0, Math.PI * 2)
+      ctx.ellipse(0, 0, 22, 14, 0.4, 0, Math.PI * 2)
       ctx.fill()
-      ctx.fillStyle = 'rgba(80,60,180,0.5)'
+      ctx.strokeStyle = '#7a5cff'
+      ctx.lineWidth = 2.5
+      ctx.stroke()
+      const sx = -14 + ((nowMs / 28) % 28)
+      ctx.fillStyle = 'rgba(150,130,255,0.55)'
       ctx.beginPath()
-      ctx.ellipse(-3, -2, 6, 4, 0.4, 0, Math.PI * 2)
+      ctx.ellipse(sx, -3, 7, 4, 0.4, 0, Math.PI * 2)
       ctx.fill()
-    } else {
-      ctx.fillStyle = '#8a5a2b'
-      ctx.strokeStyle = '#4a2f14'
-      ctx.lineWidth = 2
-      ctx.fillRect(-10, -10, 20, 20)
-      ctx.strokeRect(-10, -10, 20, 20)
+      ctx.globalAlpha = 1
       ctx.fillStyle = '#ffd23f'
-      ctx.font = 'bold 12px monospace'
+      ctx.font = 'bold 15px monospace'
       ctx.textAlign = 'center'
-      ctx.fillText('!', 0, 4)
+      ctx.fillText('!', 0, -20)
     }
     ctx.restore()
   }
@@ -327,7 +345,7 @@ function drawVans(ctx, view, nowMs, onlyBridge) {
   }
 }
 
-function drawCar(ctx, view, car, nowMs) {
+function drawCar(ctx, view, track, car, nowMs) {
   const isLocal = car.seat === view?.localSeat
   const color = SEAT_COLORS[(car.colorIndex ?? car.seat) % SEAT_COLORS.length]
   ctx.save()
@@ -364,30 +382,54 @@ function drawCar(ctx, view, car, nowMs) {
   ctx.fillRect(2, -7, 8, 14)
   ctx.fillStyle = 'rgba(255,255,255,0.35)'
   ctx.fillRect(-10, -2, 7, 4)
-  // boost flames
+  // boost flames + speed lines + callout
   if (car.boosting) {
     ctx.fillStyle = Math.floor(nowMs / 60) % 2 ? '#33ccff' : '#ff9f1c'
     ctx.beginPath()
-    ctx.moveTo(-15, -7); ctx.lineTo(-28 - Math.random() * 8, 0); ctx.lineTo(-15, 7)
+    ctx.moveTo(-15, -8); ctx.lineTo(-32 - Math.random() * 10, 0); ctx.lineTo(-15, 8)
     ctx.closePath(); ctx.fill()
-  }
-  // shield ring
-  if (car.shielded) {
-    ctx.strokeStyle = 'rgba(51,204,255,0.9)'
-    ctx.lineWidth = 2.5
-    ctx.beginPath()
-    ctx.arc(0, 0, 22, 0, Math.PI * 2)
-    ctx.stroke()
-  }
-  // zap flash
-  if (car.zapped) {
-    ctx.strokeStyle = '#ffee33'
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)'
     ctx.lineWidth = 2
-    ctx.beginPath()
-    ctx.arc(0, 0, 25 + Math.sin(nowMs / 70) * 3, 0, Math.PI * 2)
-    ctx.stroke()
+    for (let i = 0; i < 3; i += 1) {
+      const ly = -14 + i * 14
+      ctx.beginPath()
+      ctx.moveTo(-20, ly); ctx.lineTo(-44, ly)
+      ctx.stroke()
+    }
   }
   ctx.restore()
+  if (car.boosting && isLocal) {
+    ctx.save()
+    ctx.translate(car.x, car.y)
+    ctx.fillStyle = '#22ff66'
+    ctx.font = 'bold 16px monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText('🚀 BOOST!', 0, -48)
+    ctx.restore()
+  }
+  // bald tires: pulsing arrow to the pits for the local car
+  if (isLocal && (car.wear ?? 0) >= 70 && track?.pit) {
+    const pit = track.pit
+    const ang = Math.atan2(pit.cy - car.y, pit.cx - car.x)
+    const pulse = 0.6 + 0.4 * Math.sin(nowMs / 200)
+    ctx.save()
+    ctx.translate(car.x, car.y - 44)
+    ctx.rotate(ang)
+    ctx.globalAlpha = pulse
+    ctx.fillStyle = (car.wear ?? 0) >= 100 ? '#ff3333' : '#ffd23f'
+    ctx.beginPath()
+    ctx.moveTo(34, 0); ctx.lineTo(14, -10); ctx.lineTo(14, -4); ctx.lineTo(0, -4)
+    ctx.lineTo(0, 4); ctx.lineTo(14, 4); ctx.lineTo(14, 10)
+    ctx.closePath(); ctx.fill()
+    ctx.restore()
+    ctx.save()
+    ctx.globalAlpha = pulse
+    ctx.fillStyle = (car.wear ?? 0) >= 100 ? '#ff3333' : '#ffd23f'
+    ctx.font = 'bold 15px monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText((car.wear ?? 0) >= 100 ? '🔧 PIT NOW!' : '🔧 TIRES — PIT SOON', car.x, car.y - 52)
+    ctx.restore()
+  }
   // nitro-style pit timing bar above a car being serviced
   if ((car.pit === 'crew' || car.pit === 'working') && isLocal) {
     drawPitBar(ctx, car, nowMs)

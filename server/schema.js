@@ -28,10 +28,8 @@ export const CarState = schema({
   wear: 'number',
   pit: 'string',
   needle: 'number',
-  shielded: 'boolean',
   boosting: 'boolean',
   spinning: 'boolean',
-  zapped: 'boolean',
   finished: 'boolean',
 })
 

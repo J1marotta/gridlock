@@ -15,13 +15,10 @@ export const SEAT_COLORS = [
   '#22dd88', '#33ccff', '#3366ff', '#c26bff',
   '#ff6bfb', '#ffffff', '#8a5a2b', '#9aa0a6',
 ]
-const ITEM_POOL = ['boost', 'oil', 'crate', 'shield', 'zap']
+const ITEM_POOL = ['boost', 'oil']
 const RANK_WEIGHTS = {
-  boost: [1, 1, 2, 3, 4, 6, 7, 8, 9, 10, 10, 10],
-  oil: [8, 7, 6, 5, 4, 3, 3, 2, 2, 1, 1, 1],
-  crate: [7, 7, 6, 5, 4, 4, 3, 3, 2, 2, 2, 2],
-  shield: [2, 2, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8],
-  zap: [0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+  boost: [2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10],
+  oil: [10, 9, 8, 7, 6, 5, 4, 3, 3, 2, 2, 2],
 }
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
@@ -72,7 +69,7 @@ export function addCar(race, { playerId, name, color, isNpc, seat }) {
     seg: info.seg, level: levelAt(race.track, info.seg),
     lap: 1, nextGate: 0, looped: false, progress: 0, place: seat + 1,
     wear: 0, item: '', itemHeldMs: 0,
-    boostUntil: 0, shieldUntil: 0, zapUntil: 0, spinUntil: 0, spinDir: 1,
+    boostUntil: 0, spinUntil: 0, spinDir: 1,
     pitState: 'none', pitHoldMs: 0, pitNeedleT: 0, pitWorkMs: 0, pitAutoAt: 0, pitGrade: '',
     pitArmed: true,
     finished: false, finishTimeMs: 0,
@@ -139,18 +136,7 @@ export function useItem(race, car) {
   const t = race.tune.items
   if (item === 'boost') car.boostUntil = race.now + t.boostMs
   else if (item === 'oil') dropHazard(race, car, 'oil')
-  else if (item === 'crate') dropHazard(race, car, 'crate')
-  else if (item === 'shield') car.shieldUntil = race.now + t.shieldMs
-  else if (item === 'zap') {
-    for (const other of race.cars) {
-      if (other === car || other.finished) continue
-      if (other.progress > car.progress) {
-        if (other.shieldUntil > race.now) other.shieldUntil = 0
-        else other.zapUntil = race.now + t.zapMs
-      }
-    }
-    logEvent(race, 'zap', `⚡ ${car.name} zaps the field!`, car.seat)
-  }
+  else return false
   car.item = ''
   return true
 }
@@ -158,26 +144,11 @@ export function useItem(race, car) {
 function hitHazard(race, car, hz) {
   const t = race.tune.items
   if (hz.owner === car.playerId) return
-  if (car.shieldUntil > race.now) {
-    car.shieldUntil = 0
-    hz.until = 0
-    logEvent(race, 'block', `🛡 ${car.name} shrugs off a ${hz.kind}!`, car.seat)
-    return
-  }
   if (hz.kind === 'oil') {
     car.spinUntil = race.now + t.oilSpinMs
     car.spinDir = Math.random() < 0.5 ? -1 : 1
     hz.until = 0
     logEvent(race, 'spin', `🌀 ${car.name} spins on oil!`, car.seat)
-  } else if (hz.kind === 'crate') {
-    car.vx *= -0.3
-    car.vy *= -0.3
-    const sp = Math.hypot(car.vx, car.vy) * t.crateSlow
-    const a = Math.atan2(car.vy, car.vx) || car.angle
-    car.vx = Math.cos(a) * sp
-    car.vy = Math.sin(a) * sp
-    hz.until = 0
-    logEvent(race, 'bonk', `📦 ${car.name} eats a crate!`, car.seat)
   }
 }
 
@@ -225,7 +196,6 @@ function stepCar(race, car, dt) {
   let top = BASE_TOP * topMul
   if (off) top *= tune.car.offTopMul
   if (now < car.boostUntil) top *= tune.items.boostTopMul
-  if (now < car.zapUntil) top *= tune.items.zapSlowMul
 
   const dirx = Math.cos(car.angle), diry = Math.sin(car.angle)
   let vf = car.vx * dirx + car.vy * diry
@@ -487,9 +457,7 @@ export function aiItems(race, car) {
   if (!race.tune.items[car.item]) { car.item = ''; return }
   if (car.item === 'boost') {
     if (Math.hypot(car.vx, car.vy) > 200) useItem(race, car)
-  } else if (car.item === 'zap') {
-    useItem(race, car)
-  } else if ((car.item === 'oil' || car.item === 'crate') && race.now - car.itemHeldMs > 4000) {
+  } else if (car.item === 'oil' && race.now - car.itemHeldMs > 4000) {
     const behind = race.cars.some(o => o !== car && !o.finished &&
       Math.hypot(o.x - car.x, o.y - car.y) < 150 && o.progress < car.progress)
     if (behind || race.now - car.itemHeldMs > 9000) useItem(race, car)

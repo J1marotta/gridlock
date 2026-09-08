@@ -11,7 +11,8 @@ import TrackStudio, { STUDIO_SLOTS } from './game/TrackStudio.jsx'
 import { TRACKS, getTrackData } from './game/tracks.js'
 import { trackFromData } from './game/track.js'
 
-const ITEM_GLYPH = { boost: '🚀', oil: '🛢', crate: '📦', shield: '🛡', zap: '⚡' }
+const ITEM_GLYPH = { boost: '🚀', oil: '🛢' }
+const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL SPILL' }
 
 function useTransport() {
   const ref = useRef(null)
@@ -497,8 +498,8 @@ function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, inRoom
             <span className="dot" style={{ background: SEAT_COLORS[(c.colorIndex ?? c.seat) % SEAT_COLORS.length] }} />
             <span className="chip-name">{c.seat === mySeat ? 'YOU' : (c.name || '').slice(0, 10)}</span>
             <span className="chip-lap">LAP {c.lap ?? '–'}/{view?.laps ?? 3}</span>
-            <span className="chip-item">{c.item ? (ITEM_GLYPH[c.item] ?? '?') : ''}</span>
-            <span className={`tire ${(c.wear ?? 0) >= 100 ? 'bald' : (c.wear ?? 0) >= 70 ? 'worn' : ''}`} title="tire life">●{Math.max(0, 100 - Math.round(c.wear ?? 0))}%</span>
+            <span className="chip-item" title={c.item ? ITEM_LABEL[c.item] : ''}>{c.item ? (ITEM_GLYPH[c.item] ?? '?') : ''}</span>
+            <span className={`tire ${(c.wear ?? 0) >= 100 ? 'bald' : (c.wear ?? 0) >= 70 ? 'worn' : ''}`} title="tire life">●{Math.max(0, 100 - Math.round(c.wear ?? 0))}%{c.seat === mySeat && (c.wear ?? 0) >= 100 ? ' PIT!' : ''}</span>
             {c.pit !== 'none' && c.pit ? <span>🔧</span> : null}
           </div>
         ))}

@@ -37,9 +37,9 @@ describe('tune system', () => {
 
   it('patch applies many at once and counts', () => {
     const t = cloneTune()
-    expect(applyPatch(t, { 'car.grip': 3, 'items.zap': false, 'bogus.x': 1 })).toBe(2)
+    expect(applyPatch(t, { 'car.grip': 3, 'items.oil': false, 'bogus.x': 1 })).toBe(2)
     expect(t.car.grip).toBe(3)
-    expect(t.items.zap).toBe(false)
+    expect(t.items.oil).toBe(false)
   })
 
   it('clones are independent', () => {

@@ -92,7 +92,7 @@ describe('gridlock driving', () => {
 describe('gridlock items', () => {
   it('disabled items never roll, enabled ones do', () => {
     const tune = cloneTune()
-    Object.assign(tune.items, { boost: false, oil: false, crate: false, shield: false, zap: false })
+    Object.assign(tune.items, { boost: false, oil: false })
     const race = createRace(tune)
     addCar(race, { playerId: 'a', name: 'A', color: '#fff', seat: 0 })
     const [me] = race.cars
@@ -106,34 +106,35 @@ describe('gridlock items', () => {
     expect(me.item).toBe('boost')
   })
 
-  it('boost raises the ceiling, oil spins, shield absorbs', () => {
+  it('boost raises the ceiling and oil spins', () => {
     const race = testRace()
     const [me, npc] = race.cars
     me.item = 'boost'
     expect(useItem(race, me)).toBe(true)
     expect(me.boostUntil).toBeGreaterThan(0)
-    // oil under the npc spins it
+    expect(me.item).toBe('')
+    // oil under the npc spins it, then expires
     race.hazards.push({ id: 1, kind: 'oil', x: npc.x, y: npc.y, owner: 'a', until: 60000 })
     stepRace(race, 0.05, 50)
     expect(npc.spinUntil).toBeGreaterThan(0)
-    // shield shrugs it off instead
-    npc.spinUntil = 0
-    npc.shieldUntil = 60000
-    race.hazards.push({ id: 2, kind: 'oil', x: npc.x, y: npc.y, owner: 'a', until: 60000 })
-    stepRace(race, 0.05, 100)
-    expect(npc.spinUntil).toBe(0)
-    expect(npc.shieldUntil).toBe(0)
+    // unknown items do nothing
+    me.item = 'zap'
+    expect(useItem(race, me)).toBe(false)
+    expect(me.item).toBe('zap')
   })
 
-  it('zap only hits cars ahead', () => {
+  it('oil drops behind and the owner is immune', () => {
     const race = testRace()
-    const [me, npc] = race.cars
-    me.progress = 10
-    npc.progress = 500
-    me.item = 'zap'
-    useItem(race, me)
-    expect(npc.zapUntil).toBeGreaterThan(0)
-    expect(me.zapUntil).toBe(0)
+    const [me] = race.cars
+    me.item = 'oil'
+    expect(useItem(race, me)).toBe(true)
+    expect(race.hazards.length).toBe(1)
+    expect(race.hazards[0].kind).toBe('oil')
+    // owner drives over its own slick unscathed
+    me.x = race.hazards[0].x
+    me.y = race.hazards[0].y
+    stepRace(race, 0.05, 50)
+    expect(me.spinUntil).toBe(0)
   })
 })
 

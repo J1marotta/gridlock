@@ -293,10 +293,8 @@ export class GridRoom extends Room {
       s.wear = Math.round(Math.min(100, car.wear))
       s.pit = car.pitState
       s.needle = car.pitState === 'crew' ? ((car.pitNeedleT % 1 + 1) % 1) : 0
-      s.shielded = nowMs < car.shieldUntil
       s.boosting = nowMs < car.boostUntil
       s.spinning = nowMs < car.spinUntil
-      s.zapped = nowMs < car.zapUntil
       s.finished = car.finished
     }
     // hazards
