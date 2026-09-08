@@ -7,7 +7,9 @@ import { renderRace } from './game/raceCanvas.js'
 import { GridAudio } from './game/audio.js'
 import { LocalRace } from './game/localRace.js'
 import AdminPanel from './game/AdminPanel.jsx'
-import TrackStudio from './game/TrackStudio.jsx'
+import TrackStudio, { STUDIO_SLOTS } from './game/TrackStudio.jsx'
+import { TRACKS, getTrackData } from './game/tracks.js'
+import { trackFromData } from './game/track.js'
 
 const ITEM_GLYPH = { boost: '🚀', oil: '🛢', crate: '📦', shield: '🛡', zap: '⚡' }
 
@@ -25,6 +27,7 @@ function adaptNetView(snapshot, privateState, tune) {
     roomCode: snapshot.roomCode,
     raceNo: snapshot.raceNo,
     laps: tune.race.laps,
+    trackName: snapshot.trackName ?? 'Speedway',
     countdownEndsAt: snapshot.countdownEndsAt,
     winnerName: snapshot.winnerName,
     winnerSeat: snapshot.winnerSeat,
@@ -54,6 +57,8 @@ export default function GridApp() {
   const [closedMsg, setClosedMsg] = useState('')
   const [muted, setMuted] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
+  const [soloTrack, setSoloTrack] = useState(() => localStorage.getItem('gridlock-track') || 'speedway')
+  const [hostTrack, setHostTrack] = useState('speedway')
   // solo state
   const localRef = useRef(null)
   const localTuneRef = useRef(null)
@@ -73,6 +78,17 @@ export default function GridApp() {
     return adaptNetView(snapshot, privateState, netTune)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot, privateState, netTune, mode, localVersion])
+
+  // multiplayer track comes down as JSON (premade or host studio upload)
+  const netTrackJson = mode === 'net' ? snapshot?.trackJson : null
+  const netTrack = useMemo(() => {
+    if (!netTrackJson) return undefined
+    try {
+      const data = JSON.parse(netTrackJson)
+      const v = trackFromData(data)
+      return v.ok ? v.track : undefined
+    } catch { return undefined }
+  }, [netTrackJson])
 
   function isHost() {
     if (mode === 'local') return true
@@ -237,11 +253,33 @@ export default function GridApp() {
     finally { setBusy(false) }
   }
 
+  function studioSlots() {
+    return STUDIO_SLOTS.map((key, i) => {
+      try {
+        const text = localStorage.getItem(key)
+        if (!text) return null
+        const data = JSON.parse(text)
+        return data?.points ? { value: `slot:${i}`, label: `${data.name || 'Studio'} (slot ${i + 1})`, data } : null
+      } catch { return null }
+    })
+  }
+
+  function resolveTrackData(ref) {
+    if (ref?.startsWith('slot:')) {
+      const slot = studioSlots()[Number(ref.split(':')[1])]
+      if (slot) return slot.data
+    }
+    return getTrackData(ref).data
+  }
+
   function startSolo() {
     audioRef.current.ensure()
     localStorage.setItem('gridlock-name', name)
+    const data = resolveTrackData(soloTrack)
+    localStorage.setItem('gridlock-track', soloTrack)
     localTuneRef.current = cloneTune()
-    localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: localTuneRef.current })
+    localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: localTuneRef.current, trackData: data })
+    localRef.current.soloTrackData = data
     localRef.current.start()
     keysRef.current = { up: false, down: false, left: false, right: false }
     lastInputSent.current = ''
@@ -252,8 +290,9 @@ export default function GridApp() {
 
   function soloRematch() {
     const t = localTuneRef.current ?? cloneTune()
-    const custom = localRef.current?.customTrack ?? null
+    const custom = localRef.current?.soloTrackData ?? localRef.current?.customTrack ?? null
     localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: t, trackData: custom })
+    localRef.current.soloTrackData = custom
     localRef.current.start()
     setScreen('countdown')
   }
@@ -321,6 +360,13 @@ export default function GridApp() {
                 <button className="nitro-btn go" onClick={startSolo}>SOLO TEST (VS CPU)</button>
                 <button className="nitro-btn" onClick={() => setScreen('studio')}>🎨 TRACK STUDIO</button>
               </div>
+              <div className="nitro-row" style={{ marginTop: 8 }}>
+                <label className="dim small">SOLO TRACK
+                  <TrackSelect
+                    value={soloTrack} onChange={setSoloTrack} slots={studioSlots()}
+                  />
+                </label>
+              </div>
               <p className="dim small">
                 ↑ gas · ↓ brake · ← → steer · Space item / pit timing · <kbd>~</kbd> live tune panel.
                 Tires wear — the pit crew runs out when you box. Endpoint: {getColyseusEndpoint()}
@@ -341,6 +387,7 @@ export default function GridApp() {
         {screen === 'lobby' && view && (
           <div className="grid-card">
             <h2>LOBBY — {view.roomCode}</h2>
+            <p className="dim">TRACK: <b>{view.trackName || 'Speedway'}</b></p>
             <ul className="nitro-players">
               {view.players.map(p => (
                 <li key={p.id}>
@@ -356,6 +403,20 @@ export default function GridApp() {
               {isHost() && <button className="nitro-btn go" onClick={() => transport.start()}>START RACE</button>}
               <button className="nitro-btn" onClick={() => setAdminOpen(true)}>🔧 TUNE (host)</button>
             </div>
+            {mode === 'net' && isHost() && (
+              <div className="nitro-row" style={{ marginTop: 8 }}>
+                <label className="dim small">TRACK
+                  <TrackSelect
+                    value={hostTrack}
+                    onChange={v => {
+                      setHostTrack(v)
+                      try { transport.setTrack(resolveTrackData(v)) } catch { /* noop */ }
+                    }}
+                    slots={studioSlots()}
+                  />
+                </label>
+              </div>
+            )}
           </div>
         )}
 
@@ -367,7 +428,7 @@ export default function GridApp() {
           <>
             <RaceCanvas
               view={view} audio={audioRef.current} mySeat={mySeat}
-              track={mode === 'local' && localRef.current ? localRef.current.race.track : undefined}
+              track={mode === 'local' && localRef.current ? localRef.current.race.track : netTrack}
             />
             {screen === 'finished' && (
               <div className="grid-card" ref={resultRef}>
@@ -413,6 +474,15 @@ export default function GridApp() {
         onClose={() => setAdminOpen(false)} onPatch={onPatch} onReset={onPatch}
       />
     </div>
+  )
+}
+
+function TrackSelect({ value, onChange, slots }) {
+  return (
+    <select className="g-input" value={value} onChange={e => onChange(e.target.value)} style={{ marginLeft: 6 }}>
+      {TRACKS.map(t => <option key={t.id} value={t.id}>{t.name} — {t.blurb}</option>)}
+      {slots.map(s => s && <option key={s.value} value={s.value}>🎨 {s.label}</option>)}
+    </select>
   )
 }
 

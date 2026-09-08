@@ -17,7 +17,7 @@ export const WORLD_H = 900
 export const HALF_WIDTH = 46
 export const GATE_COUNT = 12
 
-const CENTER = [
+export const STOCK_POINTS = [
   [240, 740], [420, 748], [600, 748], [780, 742],
   [940, 720], [1040, 670], [1100, 600],
   [1120, 520], [1060, 460], [980, 470], [920, 430],
@@ -59,7 +59,7 @@ export function makeTrack(points, opts = {}) {
 }
 
 export function buildTrack() {
-  return makeTrack(CENTER)
+  return makeTrack(STOCK_POINTS)
 }
 
 // Rebuild a track from studio JSON (or an older save). Returns { ok, track?, error? }.

@@ -9,8 +9,9 @@ React shell + canvas track).
 
 ## The game
 
-- **Riverside Park**: one large hand-built circuit (sweeper, S-curves, climb,
-  top straight, hairpin, infield), fully visible at all times.
+- **Track library**: Speedway circle (default), Riverside Park, Hairpin Alley,
+  The Esses — plus anything painted in the Track Studio. Solo and the host
+  pick from premade + studio saves; the host can upload a studio loop online.
 - **12 cars**, bots fill the grid. 3 laps (tunable), checkpoints validate laps.
 - Controls: **↑ gas, ↓ brake, ← → steer, Space item / pit timing**.
 - **Items** (hold one, boxes respawn, odds favor the back): boost, oil, crate,

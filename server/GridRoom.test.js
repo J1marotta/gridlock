@@ -25,8 +25,6 @@ describe('GridRoom race flow', () => {
     expect(cmd(room, host, 'start').ok).toBe(true)
     expect(room.state.phase).toBe('countdown')
     expect(room.state.cars.size).toBe(12)
-
-    // tune is host-only and goes live immediately
     expect(cmd(room, guest, 'tune', { patch: { 'car.grip': 3 } }).ok).toBe(false)
     expect(cmd(room, host, 'tune', { patch: { 'car.grip': 3 } }).ok).toBe(true)
     expect(room.tune.car.grip).toBe(3)
@@ -57,5 +55,40 @@ describe('GridRoom race flow', () => {
     expect(cmd(room, host, 'next-race', {}, room.state.raceNo).ok).toBe(true)
     expect(room.state.phase).toBe('lobby')
     expect(room.state.raceNo).toBe(2)
+  })
+
+  it('host picks premade or studio tracks in the lobby', async () => {
+    resetActiveRoomCodesForTests()
+    seq = 0
+    const room = new GridRoom()
+    room.onCreate({ roomCode: 'GRID2' })
+    const host = mockClient('s-h2')
+    const guest = mockClient('s-g2')
+    room.onJoin(host, { playerName: 'Alf' })
+    room.onJoin(guest, { playerName: 'Bob' })
+    expect(room.state.trackName).toBe('Speedway')
+
+    // guest cannot pick, junk is rejected
+    expect(cmd(room, guest, 'set-track', { track: { points: [] } }).ok).toBe(false)
+    expect(cmd(room, host, 'set-track', { track: { points: [[0, 0]] } }).ok).toBe(false)
+
+    // host uploads a studio-style loop
+    const pts = []
+    for (let i = 0; i < 40; i += 1) {
+      const a = (i / 40) * Math.PI * 2
+      pts.push([800 + Math.cos(a) * 420, 450 + Math.sin(a) * 300])
+    }
+    const { finalizeTrack } = await import('../src/game/trackEdit.js')
+    const res = finalizeTrack(pts, { name: 'Host Oval' })
+    expect(res.ok).toBe(true)
+    expect(cmd(room, host, 'set-track', { track: res.data }).ok).toBe(true)
+    expect(room.state.trackName).toBe('Host Oval')
+
+    // the uploaded loop is what gets raced
+    expect(cmd(room, host, 'ready', { ready: true }).ok).toBe(true)
+    expect(cmd(room, guest, 'ready', { ready: true }).ok).toBe(true)
+    expect(cmd(room, host, 'start').ok).toBe(true)
+    expect(room.race.track.points.length).toBe(res.data.points.length)
+    expect(room.race.track.pit.cx).toBe(res.data.pit.cx)
   })
 })

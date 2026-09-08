@@ -95,6 +95,7 @@ export class ColyseusTransport {
   useItem() { this.command(CLIENT_MESSAGE_TYPES.USE_ITEM) }
   pitPress() { this.command(CLIENT_MESSAGE_TYPES.PIT_PRESS) }
   tune(patch) { this.command(CLIENT_MESSAGE_TYPES.TUNE, { patch }) }
+  setTrack(track) { this.command(CLIENT_MESSAGE_TYPES.SET_TRACK, { track }) }
   nextRace() { this.command(CLIENT_MESSAGE_TYPES.NEXT_RACE) }
 
   async leave() {

@@ -145,7 +145,10 @@ export function autoPit(points, halfWidth) {
     { x: mx - dy * off, y: my + dx * off },
     { x: mx + dy * off, y: my - dx * off },
   ]
-  const scored = cands.map(c => ({ ...c, clear: clearanceAt(points, halfWidth, c.x, c.y) }))
+  const scored = cands.map(c => {
+    const inBounds = c.x > 90 && c.x < WORLD_W - 90 && c.y > 90 && c.y < WORLD_H - 90
+    return { ...c, clear: clearanceAt(points, halfWidth, c.x, c.y) - (inBounds ? 0 : 1000) }
+  })
   scored.sort((p, q) => q.clear - p.clear)
   const chosen = scored[0]
   const warnings = []

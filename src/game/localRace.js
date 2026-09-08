@@ -2,6 +2,7 @@
 // items and live tune as multiplayer — no server needed.
 import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from '../../server/sim.js'
 import { trackFromData } from './track.js'
+import { getTrackData } from './tracks.js'
 import { cloneTune } from './tune.js'
 
 const BOT_NAMES = ['Vex', 'Turbo', 'Skidz', 'Octane', 'Drifty', 'Nitro', 'Sparks', 'Axel', 'Gear', 'Ruby', 'Max']
@@ -9,10 +10,11 @@ const BOT_NAMES = ['Vex', 'Turbo', 'Skidz', 'Octane', 'Drifty', 'Nitro', 'Sparks
 export class LocalRace {
   constructor({ playerName = 'Racer', tune = null, trackData = null } = {}) {
     this.tune = tune ?? cloneTune()
-    const custom = trackData ? trackFromData(trackData) : null
-    if (trackData && !custom.ok) throw new Error(custom.error)
-    this.trackName = trackData?.name ?? 'Riverside Park'
-    this.race = createRace(this.tune, custom ? custom.track : null)
+    const data = trackData ?? getTrackData('speedway').data
+    const custom = trackFromData(data)
+    if (!custom.ok) throw new Error(custom.error)
+    this.trackName = data?.name ?? 'Speedway'
+    this.race = createRace(this.tune, custom.track)
     addCar(this.race, { playerId: 'you', name: playerName, color: SEAT_COLORS[0], isNpc: false, seat: 0 })
     for (let seat = 1; seat < 12; seat += 1) {
       addCar(this.race, {

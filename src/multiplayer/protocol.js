@@ -9,6 +9,7 @@ export const CLIENT_MESSAGE_TYPES = Object.freeze({
   USE_ITEM: 'use-item',
   PIT_PRESS: 'pit-press',
   TUNE: 'tune',
+  SET_TRACK: 'set-track',
   NEXT_RACE: 'next-race',
   LEAVE: 'leave',
 })
@@ -42,6 +43,7 @@ const payloadValidators = {
   [CLIENT_MESSAGE_TYPES.USE_ITEM]: () => true,
   [CLIENT_MESSAGE_TYPES.PIT_PRESS]: () => true,
   [CLIENT_MESSAGE_TYPES.TUNE]: p => isObject(p.patch),
+  [CLIENT_MESSAGE_TYPES.SET_TRACK]: p => isObject(p.track) && Array.isArray(p.track.points),
   [CLIENT_MESSAGE_TYPES.NEXT_RACE]: () => true,
   [CLIENT_MESSAGE_TYPES.LEAVE]: () => true,
 }

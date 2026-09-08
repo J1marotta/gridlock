@@ -7,7 +7,8 @@ import {
 } from './trackEdit.js'
 
 const SCALE = 0.55 // 1600x900 -> 880x495 canvas
-const SLOTS = ['gridlock-track-a', 'gridlock-track-b', 'gridlock-track-c']
+export const STUDIO_SLOTS = ['gridlock-track-a', 'gridlock-track-b', 'gridlock-track-c']
+const SLOTS = STUDIO_SLOTS
 
 function toWorld(e, canvas) {
   const r = canvas.getBoundingClientRect()

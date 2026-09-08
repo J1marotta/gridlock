@@ -8,6 +8,8 @@ import {
   validateClientMessage,
 } from '../src/multiplayer/protocol.js'
 import { applyPatch, cloneTune } from '../src/game/tune.js'
+import { getTrack, getTrackData } from '../src/game/tracks.js'
+import { trackFromData } from '../src/game/track.js'
 import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from './sim.js'
 import { BoxState, CarState, FeedEvent, GridState, HazardState, PlayerState, VanState } from './schema.js'
 import { SERVER_TICK_MS } from './sim.js'
@@ -39,6 +41,7 @@ export class GridRoom extends Room {
   closing = false
   tune = cloneTune()
   race = null
+  pendingTrackData = null
   messages = { command: (client, message) => this.handleCommand(client, message) }
 
   onCreate(options = {}) {
@@ -58,6 +61,8 @@ export class GridRoom extends Room {
       winnerEventId: '',
       hostPlayerId: '',
       tuneJson: JSON.stringify(this.tune),
+      trackJson: JSON.stringify(getTrackData('speedway').data),
+      trackName: 'Speedway',
     })
     this.setSimulationInterval?.(deltaMs => this.advanceSimulation(deltaMs), SERVER_TICK_MS)
   }
@@ -115,6 +120,7 @@ export class GridRoom extends Room {
     else if (msg.type === CLIENT_MESSAGE_TYPES.USE_ITEM) result = this.useItem(player)
     else if (msg.type === CLIENT_MESSAGE_TYPES.PIT_PRESS) result = this.pitPress(player)
     else if (msg.type === CLIENT_MESSAGE_TYPES.TUNE) result = this.tuneCmd(player, P.patch)
+    else if (msg.type === CLIENT_MESSAGE_TYPES.SET_TRACK) result = this.setTrack(player, P.track)
     else if (msg.type === CLIENT_MESSAGE_TYPES.NEXT_RACE) result = this.nextRace(player)
     else if (msg.type === CLIENT_MESSAGE_TYPES.LEAVE) {
       const hl = this.removePlayer(client)
@@ -152,6 +158,26 @@ export class GridRoom extends Room {
     return { ok: true, applied }
   }
 
+  setTrack(player, track) {
+    if (this.state.phase !== 'lobby') return { ok: false, error: 'wrong-phase', message: 'Lobby only' }
+    if (!this.isHost(player)) return { ok: false, error: 'host-only', message: 'Only the host picks the track' }
+    const verify = trackFromData(track)
+    if (!verify.ok) return { ok: false, error: 'invalid', message: verify.error }
+    // rebuild canonical data (resampled boxes/start derived server-side)
+    this.pendingTrackData = {
+      name: String(track.name || 'Custom Loop').slice(0, 24),
+      points: verify.track.points,
+      halfWidth: verify.track.halfWidth,
+      pit: verify.track.pit,
+      levels: verify.track.levels,
+      boxes: verify.track.boxes,
+      start: verify.track.start,
+    }
+    this.state.trackJson = JSON.stringify(this.pendingTrackData)
+    this.state.trackName = this.pendingTrackData.name
+    return { ok: true }
+  }
+
   carOf(playerId) {
     const seat = this.seatByPlayerId.get(playerId)
     return seat === undefined ? null : this.race?.cars.find(c => c.seat === seat) ?? null
@@ -184,7 +210,7 @@ export class GridRoom extends Room {
     if (!humans.length || humans.some(p => !p.ready)) {
       return { ok: false, error: 'not-ready', message: 'Everyone must ready up' }
     }
-    this.race = createRace(this.tune)
+    this.race = createRace(this.tune, this.selectedTrack())
     this.seatByPlayerId.clear()
     this.inputByPlayerId.clear()
     this.lastLapAt.clear()
@@ -213,9 +239,19 @@ export class GridRoom extends Room {
     this.state.winnerName = ''
     this.state.winnerSeat = -1
     this.state.tuneJson = JSON.stringify(this.tune)
+    this.state.trackJson = JSON.stringify(this.pendingTrackData ?? getTrackData('speedway').data)
+    this.state.trackName = this.pendingTrackData?.name ?? 'Speedway'
     this.state.phase = 'countdown'
     this.syncWorld(now)
     return { ok: true }
+  }
+
+  selectedTrack() {
+    if (this.pendingTrackData) {
+      const verify = trackFromData(this.pendingTrackData)
+      if (verify.ok) return verify.track
+    }
+    return getTrack('speedway')
   }
 
   sendPrivate(playerId, seat) {
