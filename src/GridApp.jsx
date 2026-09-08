@@ -493,9 +493,10 @@ function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, inRoom
       <div className="chips-row">
         {(chips.length ? chips : [{ seat: -1, name: '—', place: 0 }]).slice(0, 12).map(c => (
           <div key={c.seat} className={`chip ${c.seat === mySeat ? 'me' : ''} ${c.seat === chips[0]?.seat && chips.length ? 'leader' : ''}`}>
+            <span className="chip-pos">P{c.place || '–'}</span>
             <span className="dot" style={{ background: SEAT_COLORS[(c.colorIndex ?? c.seat) % SEAT_COLORS.length] }} />
             <span className="chip-name">{c.seat === mySeat ? 'YOU' : (c.name || '').slice(0, 10)}</span>
-            <span className="chip-lap">L{c.lap ?? '–'}/{view?.laps ?? 3}</span>
+            <span className="chip-lap">LAP {c.lap ?? '–'}/{view?.laps ?? 3}</span>
             <span className="chip-item">{c.item ? (ITEM_GLYPH[c.item] ?? '?') : ''}</span>
             <span className={`tire ${(c.wear ?? 0) >= 100 ? 'bald' : (c.wear ?? 0) >= 70 ? 'worn' : ''}`} title="tire life">●{Math.max(0, 100 - Math.round(c.wear ?? 0))}%</span>
             {c.pit !== 'none' && c.pit ? <span>🔧</span> : null}

@@ -1,7 +1,7 @@
 // Premade track library. Speedway (big circle) is the default; Riverside is
 // the original hand-built loop. All entries validate and host full AI races
 // in tracks.test.js — nothing ships unraceable.
-import { buildTrack, makeTrack } from './track.js'
+import { makeTrack } from './track.js'
 import { prepareData } from './trackEdit.js'
 
 function circlePoints(cx, cy, r, n = 64, startAngle = Math.PI / 2) {
@@ -43,23 +43,8 @@ function premade(id, name, blurb, points) {
   return { id, name, blurb, data: res.data, warnings: res.warnings }
 }
 
-// Riverside: the original hand-tuned loop, exactly as built (pit included).
-function riversideData() {
-  const stock = buildTrack()
-  return {
-    name: 'Riverside Park',
-    points: stock.points,
-    halfWidth: stock.halfWidth,
-    pit: stock.pit,
-    levels: stock.levels,
-    boxes: stock.boxes,
-    start: stock.start,
-  }
-}
-
 export const TRACKS = [
   premade('speedway', 'Speedway', 'Big circle. Flat out, close packs, pits decide it.', circlePoints(800, 450, 390)),
-  { id: 'riverside', name: 'Riverside Park', blurb: 'The original: sweeper, Esses, climb, hairpin, infield.', data: riversideData(), warnings: [] },
   premade('hairpin', 'Hairpin Alley', 'Stadium straights, brutal hairpins both ends.', roundedRectPoints(800, 450, 1050, 430, 70)),
   premade('esses', 'The Esses', 'Kidney loop — curvature never sits still.', kidneyPoints(800, 450, 335, 0.16, 0.6)),
 ]

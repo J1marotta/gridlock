@@ -333,37 +333,42 @@ function drawCar(ctx, view, car, nowMs) {
   ctx.save()
   ctx.translate(car.x, car.y)
   // name + place
-  ctx.font = `${isLocal ? 'bold 15px' : '12px'} monospace`
+  ctx.font = `${isLocal ? 'bold 17px' : '14px'} monospace`
   ctx.textAlign = 'center'
-  ctx.fillStyle = isLocal ? '#fff' : 'rgba(255,255,255,0.85)'
+  ctx.fillStyle = isLocal ? '#fff' : 'rgba(255,255,255,0.9)'
+  ctx.strokeStyle = 'rgba(0,0,0,0.8)'
+  ctx.lineWidth = 3
   const label = isLocal ? `YOU·P${car.place}` : `${(car.name || '').slice(0, 10)}·P${car.place}`
-  ctx.fillText(car.finished ? `🏁 ${label}` : label, 0, -26)
+  const labelText = car.finished ? `🏁 ${label}` : label
+  ctx.strokeText(labelText, 0, -28)
+  ctx.fillText(labelText, 0, -28)
   // held item chip
   if (car.item) {
-    ctx.font = '13px monospace'
-    ctx.fillText(ITEM_GLYPH[car.item] ?? '?', 20, -24)
+    ctx.font = '15px monospace'
+    ctx.strokeText(ITEM_GLYPH[car.item] ?? '?', 24, -26)
+    ctx.fillText(ITEM_GLYPH[car.item] ?? '?', 24, -26)
   }
   ctx.rotate(car.angle + (car.spinning ? Math.sin(nowMs / 90) * 0.9 : 0))
-  // shadow + body
+  // shadow + body (slightly larger than the physics radius reads clearly)
   ctx.fillStyle = 'rgba(0,0,0,0.35)'
-  ctx.fillRect(-13, -8, 27, 19)
+  ctx.fillRect(-15, -9, 31, 21)
   ctx.fillStyle = color
   ctx.strokeStyle = isLocal ? '#fff' : 'rgba(0,0,0,0.6)'
   ctx.lineWidth = isLocal ? 3 : 2
   ctx.beginPath()
-  ctx.roundRect(-13, -9, 27, 18, 4)
+  ctx.roundRect(-15, -10, 31, 20, 5)
   ctx.fill()
   ctx.stroke()
   // windshield + stripe
   ctx.fillStyle = 'rgba(10,14,24,0.9)'
-  ctx.fillRect(1, -6, 7, 12)
+  ctx.fillRect(2, -7, 8, 14)
   ctx.fillStyle = 'rgba(255,255,255,0.35)'
-  ctx.fillRect(-9, -2, 6, 4)
+  ctx.fillRect(-10, -2, 7, 4)
   // boost flames
   if (car.boosting) {
     ctx.fillStyle = Math.floor(nowMs / 60) % 2 ? '#33ccff' : '#ff9f1c'
     ctx.beginPath()
-    ctx.moveTo(-13, -6); ctx.lineTo(-24 - Math.random() * 8, 0); ctx.lineTo(-13, 6)
+    ctx.moveTo(-15, -7); ctx.lineTo(-28 - Math.random() * 8, 0); ctx.lineTo(-15, 7)
     ctx.closePath(); ctx.fill()
   }
   // shield ring
@@ -371,7 +376,7 @@ function drawCar(ctx, view, car, nowMs) {
     ctx.strokeStyle = 'rgba(51,204,255,0.9)'
     ctx.lineWidth = 2.5
     ctx.beginPath()
-    ctx.arc(0, 0, 19, 0, Math.PI * 2)
+    ctx.arc(0, 0, 22, 0, Math.PI * 2)
     ctx.stroke()
   }
   // zap flash
@@ -379,7 +384,7 @@ function drawCar(ctx, view, car, nowMs) {
     ctx.strokeStyle = '#ffee33'
     ctx.lineWidth = 2
     ctx.beginPath()
-    ctx.arc(0, 0, 22 + Math.sin(nowMs / 70) * 3, 0, Math.PI * 2)
+    ctx.arc(0, 0, 25 + Math.sin(nowMs / 70) * 3, 0, Math.PI * 2)
     ctx.stroke()
   }
   ctx.restore()

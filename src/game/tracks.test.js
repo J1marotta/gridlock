@@ -10,7 +10,7 @@ describe('track library', () => {
   })
 
   it('every premade validates and has the full kit', () => {
-    expect(TRACKS.length).toBe(4)
+    expect(TRACKS.length).toBe(3)
     for (const t of TRACKS) {
       const res = trackFromData(t.data)
       expect(res.ok, t.id).toBe(true)
@@ -18,6 +18,17 @@ describe('track library', () => {
       expect(t.data.boxes).toHaveLength(6)
       expect(t.data.pit.length).toBeGreaterThan(200)
       expect(t.data.start.angle).toBeDefined()
+      // fits on a laptop screen: everything inside the world with margin
+      for (const [x, y] of t.data.points) {
+        expect(x, `${t.id} x`).toBeGreaterThanOrEqual(40)
+        expect(x, `${t.id} x`).toBeLessThanOrEqual(1560)
+        expect(y, `${t.id} y`).toBeGreaterThanOrEqual(40)
+        expect(y, `${t.id} y`).toBeLessThanOrEqual(860)
+      }
+      expect(t.data.pit.cx).toBeGreaterThanOrEqual(40)
+      expect(t.data.pit.cx).toBeLessThanOrEqual(1560)
+      expect(t.data.pit.cy).toBeGreaterThanOrEqual(40)
+      expect(t.data.pit.cy).toBeLessThanOrEqual(860)
     }
   })
 
