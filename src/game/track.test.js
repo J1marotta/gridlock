@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   HALF_WIDTH, WORLD_H, WORLD_W,
-  buildDecor, buildTrack, closestOnTrack, gateAt, gridSlot, inPitBox, inPitZone, pitBoxFor, pointAhead,
+  buildDecor, buildTrack, closestOnTrack, closestOnTrackLevel, gateAt, gridSlot, inPitZone, levelAt, makeTrack, pointAhead, trackFromData,
 } from './track.js'
 
 describe('riverside park', () => {
@@ -62,13 +62,14 @@ describe('riverside park', () => {
     }
   })
 
-  it('pit boxes live inside the pit zone', () => {
-    expect(inPitZone(track, 500, 832)).toBe(true)
+  it('pit lane is an oriented zone any stopped car can use', () => {
+    const pit = track.pit
+    expect(pit.length).toBeGreaterThan(400)
+    expect(pit.width).toBeGreaterThan(60)
+    // center + deep inside serve; far straight does not
+    expect(inPitZone(track, pit.cx, pit.cy)).toBe(true)
     expect(inPitZone(track, 500, 748)).toBe(false)
-    for (let i = 0; i < 12; i += 1) {
-      const b = pitBoxFor(track, i)
-      expect(inPitBox(track, i, b.x, b.y)).toBe(true)
-    }
+    expect(inPitZone(track, 60, 60)).toBe(false)
   })
 
   it('item boxes sit on the racing surface', () => {
@@ -84,5 +85,47 @@ describe('riverside park', () => {
     for (const t of d.trees) {
       expect(closestOnTrack(track, t.x, t.y).dist).toBeGreaterThanOrEqual(90)
     }
+  })
+
+  it('stock track is all ground level', () => {
+    for (let i = 0; i < track.points.length; i += 1) expect(levelAt(track, i)).toBe(0)
+  })
+
+  it('windowed queries stick to their deck at an overlap', () => {
+    // subdivided bowtie: straights cross at (400,400); the second
+    // diagonal (segs ~12-17) is a bridge over the first (segs ~0-5)
+    const leg = (a, b, n) => Array.from({ length: n }, (_, i) => [
+      a[0] + ((b[0] - a[0]) * i) / n,
+      a[1] + ((b[1] - a[1]) * i) / n,
+    ])
+    const pts = [
+      ...leg([200, 200], [600, 600], 6),
+      ...leg([600, 600], [200, 600], 6),
+      ...leg([200, 600], [600, 200], 6),
+      ...leg([600, 200], [200, 200], 6),
+    ]
+    const levels = pts.map((_, i) => (i >= 12 && i < 18 ? 1 : 0))
+    const bow = makeTrack(pts, { levels })
+    expect(bow.points.length).toBe(24)
+    const ground = closestOnTrackLevel(bow, 400, 400, 3)
+    expect(levelAt(bow, ground.seg)).toBe(0)
+    expect(ground.seg).toBeLessThan(12)
+    const bridge = closestOnTrackLevel(bow, 400, 400, 15)
+    expect(levelAt(bow, bridge.seg)).toBe(1)
+    expect(bridge.seg).toBeGreaterThanOrEqual(12)
+    expect(bridge.seg).toBeLessThan(18)
+  })
+
+  it('legacy saves load with oriented pits', () => {
+    const pts = track.points.map(p => [...p])
+    const res = trackFromData({
+      points: pts,
+      pit: { x0: 170, x1: 1030, y0: 792, y1: 872 },
+      pitBoxes: [{ x: 1, y: 2 }],
+    })
+    expect(res.ok).toBe(true)
+    expect(res.track.pit.cx).toBe(600)
+    expect(res.track.pit.angle).toBe(0)
+    expect(inPitZone(res.track, 600, 832)).toBe(true)
   })
 })

@@ -250,6 +250,7 @@ export class GridRoom extends Room {
       s.y = Math.round(car.y * 10) / 10
       s.angle = Math.round(car.angle * 1000) / 1000
       s.speed = Math.round(Math.hypot(car.vx, car.vy))
+      s.level = car.level ?? 0
       s.lap = Math.min(car.lap, this.tune.race.laps)
       s.place = car.place
       s.item = car.item
@@ -292,6 +293,7 @@ export class GridRoom extends Room {
       s.x = Math.round(van.x)
       s.y = Math.round(van.y)
       s.angle = Math.round(van.angle * 1000) / 1000
+      s.level = van.level ?? 0
       s.wobbling = nowMs < van.wobbleUntil
     }
     for (const key of this.state.vans.keys()) {

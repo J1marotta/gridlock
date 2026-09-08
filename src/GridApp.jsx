@@ -427,7 +427,7 @@ function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, inRoom
             <span className="chip-name">{c.seat === mySeat ? 'YOU' : (c.name || '').slice(0, 10)}</span>
             <span className="chip-lap">L{c.lap ?? '–'}/{view?.laps ?? 3}</span>
             <span className="chip-item">{c.item ? (ITEM_GLYPH[c.item] ?? '?') : ''}</span>
-            <span className={`tire ${(c.wear ?? 0) >= 100 ? 'bald' : (c.wear ?? 0) >= 70 ? 'worn' : ''}`} title={`tires ${c.wear ?? 0}%`}>●</span>
+            <span className={`tire ${(c.wear ?? 0) >= 100 ? 'bald' : (c.wear ?? 0) >= 70 ? 'worn' : ''}`} title="tire life">●{Math.max(0, 100 - Math.round(c.wear ?? 0))}%</span>
             {c.pit !== 'none' && c.pit ? <span>🔧</span> : null}
           </div>
         ))}

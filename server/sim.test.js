@@ -153,21 +153,32 @@ describe('gridlock pits and tires', () => {
   })
 
   it('worn rubber is slower than fresh', () => {
-    const fresh = testRace()
-    const worn = testRace()
-    worn.cars[0].wear = 90
-    for (const r of [fresh, worn]) {
+    const mk = wear => {
+      const tune = cloneTune()
+      tune.traffic.count = 0
+      const r = createRace(tune)
+      addCar(r, { playerId: 'w', name: 'W', color: '#fff', seat: 0 })
       const [c] = r.cars
-      const p = pointAhead(r.track, 600, 0)
+      c.wear = wear
+      const p = pointAhead(r.track, 300, 0)
       c.x = p.x; c.y = p.y; c.angle = 0
-      for (let t = 0; t < 3000; t += 50) {
+      r.phase = 'racing'
+      r.now = 0
+      r.raceEndsAt = Number.MAX_SAFE_INTEGER
+      return { r, c }
+    }
+    const fresh = mk(0)
+    const worn = mk(90)
+    for (const { r, c } of [fresh, worn]) {
+      for (let t = 0; t < 1500; t += 50) {
         c.input = { steer: 0, throttle: 1 }
         stepRace(r, 0.05, t)
       }
     }
-    expect(Math.hypot(worn.cars[0].vx, worn.cars[0].vy)).toBeLessThan(
-      Math.hypot(fresh.cars[0].vx, fresh.cars[0].vy),
+    expect(Math.hypot(worn.c.vx, worn.c.vy)).toBeLessThan(
+      Math.hypot(fresh.c.vx, fresh.c.vy),
     )
+    expect(Math.hypot(fresh.c.vx, fresh.c.vy)).toBeGreaterThan(150)
   })
 })
 

@@ -23,6 +23,7 @@ export const CarState = schema({
   speed: 'number',
   lap: 'number',
   place: 'number',
+  level: 'number',
   item: 'string',
   wear: 'number',
   pit: 'string',
@@ -46,6 +47,7 @@ export const VanState = schema({
   x: 'number',
   y: 'number',
   angle: 'number',
+  level: 'number',
   wobbling: 'boolean',
 })
 

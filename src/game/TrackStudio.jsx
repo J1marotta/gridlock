@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { WORLD_H, WORLD_W, trackFromData } from './track.js'
-import { finalizeTrack, rawLength, resampleClosed, smoothClosed, validateLoop } from './trackEdit.js'
+import { levelRuns } from './raceCanvas.js'
+import {
+  clearanceAt, finalizeTrack, placePitAt, rawLength, resampleClosed,
+  smoothClosed, snapToLoop, validateLoop,
+} from './trackEdit.js'
 
 const SCALE = 0.55 // 1600x900 -> 880x495 canvas
 const SLOTS = ['gridlock-track-a', 'gridlock-track-b', 'gridlock-track-c']
@@ -13,8 +17,8 @@ function toWorld(e, canvas) {
   ]
 }
 
-// Paint the centerline with a brush. Close the loop, get pits/boxes/gates
-// generated, test-drive it, export the JSON.
+// Paint the centerline with a brush, then place the pit lane, start line and
+// bridge/tunnel spans. Close the loop to generate, test-drive, export.
 export default function TrackStudio({ onTestDrive, onExit }) {
   const canvasRef = useRef(null)
   const [raw, setRaw] = useState([])
@@ -22,10 +26,19 @@ export default function TrackStudio({ onTestDrive, onExit }) {
   const [width, setWidth] = useState(46)
   const [trackName, setTrackName] = useState('Custom Loop')
   const [result, setResult] = useState(null) // { ok, data?, errors, warnings }
+  const [tool, setTool] = useState('paint')
+  const [pitSide, setPitSide] = useState(1)
+  const [spanKind, setSpanKind] = useState(1)
+  const [spanA, setSpanA] = useState(null)
+  const [reverseStart, setReverseStart] = useState(false)
   const [importText, setImportText] = useState('')
   const [msg, setMsg] = useState('')
   const rawRef = useRef(raw)
   rawRef.current = raw
+  const toolRef = useRef(tool)
+  toolRef.current = tool
+  const resultRef = useRef(result)
+  resultRef.current = result
 
   const smoothed = raw.length > 3 ? resampleClosed(smoothClosed(raw, 2), 18) : []
   const check = raw.length > 3
@@ -41,15 +54,17 @@ export default function TrackStudio({ onTestDrive, onExit }) {
     let raf = 0
     const loop = () => {
       const W = canvas.width, H = canvas.height
+      const res = resultRef.current
       ctx.fillStyle = '#1d5c2e'
       ctx.fillRect(0, 0, W, H)
       ctx.save()
       ctx.scale(SCALE, SCALE)
-      // finalized preview ribbon
-      if (result?.ok && result.preview) {
-        const pts = result.preview
-        ctx.lineJoin = 'round'
-        ctx.lineCap = 'round'
+      ctx.lineJoin = 'round'
+      ctx.lineCap = 'round'
+      if (res?.ok && res.preview) {
+        const pts = res.preview
+        const d = res.data
+        // ribbon
         ctx.beginPath()
         ctx.moveTo(pts[0][0], pts[0][1])
         for (let i = 1; i < pts.length; i += 1) ctx.lineTo(pts[i][0], pts[i][1])
@@ -60,38 +75,55 @@ export default function TrackStudio({ onTestDrive, onExit }) {
         ctx.lineWidth = width * 2
         ctx.strokeStyle = '#3a3a44'
         ctx.stroke()
-        // pit + boxes
-        const d = result.data
+        // bridge/tunnel spans
+        const lvls = d.levels ?? []
+        if (lvls.some(l => l !== 0)) {
+          const fake = { points: pts, levels: lvls }
+          for (const run of levelRuns(fake)) {
+            if (run.level === 0) continue
+            ctx.beginPath()
+            ctx.moveTo(pts[run.from][0], pts[run.from][1])
+            for (let i = run.from + 1; i <= run.to + 1; i += 1) {
+              const p = pts[i % pts.length]
+              ctx.lineTo(p[0], p[1])
+            }
+            ctx.lineWidth = width * 2
+            ctx.strokeStyle = run.level > 0 ? 'rgba(255,159,28,0.75)' : 'rgba(51,120,255,0.75)'
+            ctx.stroke()
+          }
+        }
+        // oriented pit lane
+        const pit = d.pit
+        ctx.save()
+        ctx.translate(pit.cx, pit.cy)
+        ctx.rotate(pit.angle)
+        ctx.fillStyle = 'rgba(85,85,95,0.9)'
+        ctx.fillRect(-pit.length / 2, -pit.width / 2, pit.length, pit.width)
         ctx.strokeStyle = '#ffd23f'
         ctx.lineWidth = 3
-        ctx.strokeRect(d.pit.x0, d.pit.y0, d.pit.x1 - d.pit.x0, d.pit.y1 - d.pit.y0)
-        ctx.fillStyle = '#33ccff'
-        for (const b of d.boxes) {
-          ctx.fillRect(b.x - 10, b.y - 10, 20, 20)
-        }
+        ctx.strokeRect(-pit.length / 2, -pit.width / 2, pit.length, pit.width)
+        ctx.restore()
+        // start flag
         ctx.fillStyle = '#fff'
-        ctx.font = 'bold 22px monospace'
+        ctx.font = 'bold 26px monospace'
         ctx.textAlign = 'center'
-        ctx.fillText('🏁', d.start.x, d.start.y - 20)
+        ctx.fillText('🏁', d.start.x, d.start.y - 24)
+        // item boxes
+        ctx.fillStyle = '#33ccff'
+        for (const b of d.boxes) ctx.fillRect(b.x - 10, b.y - 10, 20, 20)
       } else if (smoothed.length > 1) {
-        // live brush ribbon
-        ctx.lineJoin = 'round'
-        ctx.lineCap = 'round'
         ctx.beginPath()
         ctx.moveTo(smoothed[0][0], smoothed[0][1])
         for (let i = 1; i < smoothed.length; i += 1) ctx.lineTo(smoothed[i][0], smoothed[i][1])
-        if (result) ctx.closePath()
         ctx.lineWidth = width * 2
         ctx.strokeStyle = 'rgba(58,58,68,0.9)'
         ctx.stroke()
-        // raw stroke dots
         ctx.fillStyle = '#ffd23f'
         for (const [x, y] of rawRef.current) {
           ctx.beginPath()
           ctx.arc(x, y, 6, 0, Math.PI * 2)
           ctx.fill()
         }
-        // start marker + snap ring
         const [sx, sy] = rawRef.current[0]
         ctx.strokeStyle = nearStart ? '#22ff66' : '#fff'
         ctx.lineWidth = 4
@@ -111,7 +143,6 @@ export default function TrackStudio({ onTestDrive, onExit }) {
         ctx.fillText('Paint one big loop with the brush', (WORLD_W / 2), WORLD_H / 2 - 10)
         ctx.fillText('finish near the white ring, then CLOSE LOOP', (WORLD_W / 2), WORLD_H / 2 + 26)
       }
-      // pinch warnings
       ctx.fillStyle = '#ff5555'
       ctx.font = 'bold 26px monospace'
       ctx.textAlign = 'center'
@@ -133,6 +164,86 @@ export default function TrackStudio({ onTestDrive, onExit }) {
     })
   }
 
+  // refs for handlers (avoid stale closures)
+  const pitSideRef = useRef(pitSide)
+  pitSideRef.current = pitSide
+  const reverseStartRef = useRef(reverseStart)
+  reverseStartRef.current = reverseStart
+  const spanARef = useRef(spanA)
+  spanARef.current = spanA
+  const spanKindRef = useRef(spanKind)
+  spanKindRef.current = spanKind
+
+  function withData(mut, note) {
+    const res = resultRef.current
+    if (!res?.ok) return
+    const data = mut({ ...res.data })
+    const verify = trackFromData(data)
+    if (!verify.ok) {
+      setMsg(`Rejected: ${verify.error}`)
+      return
+    }
+    setResult({ ...res, data })
+    if (note) setMsg(note)
+  }
+
+  function onCanvasDown(e) {
+    e.preventDefault()
+    const t = toolRef.current
+    const res = resultRef.current
+    if (t === 'paint' || !res?.ok) {
+      if (t !== 'paint') setTool('paint')
+      setResult(null)
+      setPainting(true)
+      paint(e)
+      return
+    }
+    const [x, y] = toWorld(e, canvasRef.current)
+    const pts = res.preview
+    if (t === 'pit') {
+      const snap = snapToLoop(pts, x, y)
+      const pit = placePitAt(snap, width, pitSideRef.current)
+      const clear = clearanceAt(pts, width, pit.cx, pit.cy)
+      withData(d => ({ ...d, pit }),
+        `Pit placed ${pitSideRef.current > 0 ? 'right' : 'left'} of the track` +
+        (clear < width + 20 ? ' — ⚠ close to the ribbon' : ''))
+    } else if (t === 'start') {
+      const snap = snapToLoop(pts, x, y)
+      const angle = reverseStartRef.current ? snap.angle + Math.PI : snap.angle
+      withData(d => ({ ...d, start: { x: Math.round(snap.x), y: Math.round(snap.y), angle } }),
+        'Start line moved — grid follows it')
+    } else if (t === 'span') {
+      const snap = snapToLoop(pts, x, y)
+      if (spanARef.current === null) {
+        setSpanA(snap.seg)
+        setMsg(`Span starts at seg ${snap.seg} — click where it ends`)
+      } else {
+        applySpan(spanARef.current, snap.seg)
+        setSpanA(null)
+      }
+    }
+  }
+
+  function applySpan(a, b) {
+    const res = resultRef.current
+    if (!res?.ok) return
+    const n = res.preview.length
+    const fwd = ((b - a) % n + n) % n
+    if (fwd < 4) {
+      setMsg('Span too short — pick points further apart along the loop')
+      return
+    }
+    if (fwd > n - 4) {
+      setMsg('That covers nearly the whole loop — pick a shorter span')
+      return
+    }
+    const kind = spanKindRef.current
+    const levels = [...(res.data.levels ?? res.preview.map(() => 0))]
+    for (let k = 0; k < fwd; k += 1) levels[(a + k) % n] = kind
+    withData(d => ({ ...d, levels }),
+      `${kind > 0 ? 'Bridge' : 'Tunnel'} span set (${fwd} segs)`)
+  }
+
   function closeLoop() {
     const res = finalizeTrack(rawRef.current, { name: trackName.trim() || 'Custom Loop', halfWidth: width })
     if (res.ok) {
@@ -142,7 +253,8 @@ export default function TrackStudio({ onTestDrive, onExit }) {
         return
       }
       setResult({ ...res, preview: res.data.points })
-      setMsg(`Loop closed: ${Math.round(res.total)}px, ${res.data.points.length} pts${res.warnings.length ? ' — ' + res.warnings.join(' · ') : ''}`)
+      setMsg(`Loop closed: ${Math.round(res.total)}px${res.warnings.length ? ' — ' + res.warnings.join(' · ') : ''}. Place pit/start or add spans.`)
+      setTool('pit')
     } else {
       setResult(res)
       setMsg(res.errors.join(' · '))
@@ -174,6 +286,7 @@ export default function TrackStudio({ onTestDrive, onExit }) {
       setWidth(data.halfWidth || 46)
       setResult({ ok: true, data, warnings: [], preview: data.points })
       setRaw(data.points.filter((_, i) => i % 4 === 0))
+      setTool('pit')
       setMsg(`Imported "${data.name || 'loop'}" — TEST DRIVE when ready`)
     } catch {
       setMsg('Import rejected: not valid JSON')
@@ -199,16 +312,54 @@ export default function TrackStudio({ onTestDrive, onExit }) {
     } catch { setMsg('Load failed') }
   }
 
+  const tools = [
+    ['paint', '🖌 PAINT'],
+    ['pit', '🔧 PIT'],
+    ['start', '🏁 START'],
+    ['span', spanKind > 0 ? '🌉 BRIDGE' : '🚇 TUNNEL'],
+  ]
+
   return (
     <div className="grid-card">
       <h2>🎨 TRACK STUDIO</h2>
-      <p className="dim small">Paint the centerline — the ribbon preview follows your brush. Close the loop to generate pits, boxes, gates and grid.</p>
+      <p className="dim small">Paint the centerline, close the loop, then place the pit lane, start line and bridge/tunnel spans.</p>
+      <div className="nitro-row" style={{ marginBottom: 8 }}>
+        {tools.map(([id, label]) => (
+          <button
+            key={id} className="nitro-btn small"
+            style={tool === id ? { borderColor: '#ffd23f' } : undefined}
+            disabled={id !== 'paint' && !result?.ok}
+            onClick={() => { setTool(id); setSpanA(null) }}
+          >{label}</button>
+        ))}
+        {tool === 'pit' && (
+          <button className="nitro-btn small" onClick={() => setPitSide(s => -s)}>
+            SIDE: {pitSide > 0 ? 'RIGHT →' : '← LEFT'}
+          </button>
+        )}
+        {tool === 'start' && (
+          <button className="nitro-btn small" onClick={() => setReverseStart(r => !r)}>
+            DIR: {reverseStart ? '↩ REVERSED' : 'FORWARD ↪'}
+          </button>
+        )}
+        {tool === 'span' && (
+          <button className="nitro-btn small" onClick={() => { setSpanKind(k => -k); setSpanA(null) }}>
+            {spanKind > 0 ? '🌉 BRIDGE (click 2 pts)' : '🚇 TUNNEL (click 2 pts)'}
+          </button>
+        )}
+        {tool === 'span' && result?.ok && (
+          <button
+            className="nitro-btn small"
+            onClick={() => withData(d => ({ ...d, levels: d.points.map(() => 0) }), 'Levels cleared')}
+          >CLEAR LEVELS</button>
+        )}
+      </div>
       <div className="studio-wrap">
         <canvas
           ref={canvasRef} width={Math.round(WORLD_W * SCALE)} height={Math.round(WORLD_H * SCALE)}
           className="studio-canvas"
-          onPointerDown={e => { e.preventDefault(); setResult(null); setPainting(true); paint(e) }}
-          onPointerMove={e => { if (painting) paint(e) }}
+          onPointerDown={onCanvasDown}
+          onPointerMove={e => { if (painting && toolRef.current === 'paint') paint(e) }}
           onPointerUp={() => setPainting(false)}
           onPointerLeave={() => setPainting(false)}
         />
@@ -219,9 +370,10 @@ export default function TrackStudio({ onTestDrive, onExit }) {
           {width}
         </label>
         <input className="g-input" value={trackName} onChange={e => setTrackName(e.target.value)} maxLength={24} style={{ width: 170 }} placeholder="Track name" />
-        <button className="nitro-btn" onClick={() => { setRaw([]); setResult(null); setMsg('') }}>CLEAR</button>
+        <button className="nitro-btn" onClick={() => { setRaw([]); setResult(null); setMsg(''); setTool('paint') }}>CLEAR</button>
         <button className="nitro-btn go" disabled={raw.length < 8} onClick={closeLoop}>CLOSE LOOP{nearStart ? ' ✓' : ''}</button>
       </div>
+      {spanA !== null && <p className="dim small">Span starts at seg {spanA} — click where it ends (≥4 segs along).</p>}
       {check.warnings.map((w, i) => <p key={i} className="dim small">⚠ {w}</p>)}
       {msg && <p className="dim small">{msg}</p>}
       {result?.ok && (
@@ -238,7 +390,7 @@ export default function TrackStudio({ onTestDrive, onExit }) {
           </div>
           <div className="nitro-row" style={{ marginTop: 8 }}>
             <input
-              className="g-input" style={{ flex: 1 }} placeholder='Paste track JSON to import…'
+              className="g-input" style={{ flex: 1 }} placeholder="Paste track JSON to import…"
               value={importText} onChange={e => setImportText(e.target.value)}
             />
             <button className="nitro-btn small" onClick={() => importJson(importText)}>IMPORT</button>

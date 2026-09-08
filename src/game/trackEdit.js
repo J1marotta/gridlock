@@ -115,7 +115,7 @@ export function findPinches(points, halfWidth) {
   return pinches
 }
 
-function clearanceAt(points, halfWidth, x, y) {
+export function clearanceAt(points, halfWidth, x, y) {
   let best = Infinity
   for (let i = 0; i < points.length; i += 1) {
     const a = points[i], b = points[(i + 1) % points.length]
@@ -127,7 +127,8 @@ function clearanceAt(points, halfWidth, x, y) {
 }
 
 // Pit lane alongside the longest straight, on whichever side has room.
-export function autoPit(points, halfWidth, seatCount = 12) {
+// Oriented with the track; service is zone-based anywhere in the lane.
+export function autoPit(points, halfWidth) {
   let best = { len: -1, i: 0 }
   for (let i = 0; i < points.length; i += 1) {
     const len = Math.sqrt(dist2(points[i], points[(i + 1) % points.length]))
@@ -139,7 +140,7 @@ export function autoPit(points, halfWidth, seatCount = 12) {
   const dy = (b[1] - a[1]) / (best.len || 1)
   const mx = (a[0] + b[0]) / 2
   const my = (a[1] + b[1]) / 2
-  const off = halfWidth + 52
+  const off = halfWidth + 56
   const cands = [
     { x: mx - dy * off, y: my + dx * off },
     { x: mx + dy * off, y: my - dx * off },
@@ -147,20 +148,16 @@ export function autoPit(points, halfWidth, seatCount = 12) {
   const scored = cands.map(c => ({ ...c, clear: clearanceAt(points, halfWidth, c.x, c.y) }))
   scored.sort((p, q) => q.clear - p.clear)
   const chosen = scored[0]
-  const laneLen = Math.min(860, best.len + 500)
   const warnings = []
   if (chosen.clear < 24) warnings.push('Pit lane is close to the track — expect chaos')
-  // lane rect expanded along the straight direction
-  const ex = dx * laneLen / 2, ey = dy * laneLen / 2
-  const x0 = Math.min(chosen.x - ex, chosen.x + ex) - 40
-  const x1 = Math.max(chosen.x - ex, chosen.x + ex) + 40
-  const y0 = Math.min(chosen.y - ey, chosen.y + ey) - 40
-  const y1 = Math.max(chosen.y - ey, chosen.y + ey) + 40
-  const pitBoxes = Array.from({ length: seatCount }, (_, i) => ({
-    x: chosen.x - dx * ((seatCount - 1) * 55) / 2 + dx * i * 55,
-    y: chosen.y - dy * ((seatCount - 1) * 55) / 2 + dy * i * 55,
-  }))
-  return { pit: { x0, y0, x1, y1 }, pitBoxes, warnings }
+  return {
+    pit: {
+      cx: Math.round(chosen.x), cy: Math.round(chosen.y),
+      angle: Math.atan2(dy, dx),
+      length: Math.round(Math.min(860, best.len + 420)), width: 96,
+    },
+    warnings,
+  }
 }
 
 export function validateLoop(points, halfWidth) {
@@ -180,13 +177,24 @@ export function validateLoop(points, halfWidth) {
   return { errors, warnings, total, pinches }
 }
 
-// Raw brush stroke -> raceable track JSON (or errors).
+// Raw brush stroke -> raceable track JSON (or errors). Callers may override
+// pit/start afterwards (studio placement modes) and re-run prepareData().
 export function finalizeTrack(raw, opts = {}) {
   const halfWidth = opts.halfWidth ?? 46
   const smoothed = smoothClosed(raw, 2)
   const pts = resampleClosed(smoothed, 18)
   const check = validateLoop(pts, halfWidth)
   if (check.errors.length) return { ok: false, errors: check.errors, warnings: check.warnings }
+  return prepareData(pts, {
+    name: opts.name, halfWidth,
+    pit: opts.pit, start: opts.start, levels: opts.levels,
+    warnings: check.warnings,
+  })
+}
+
+// Assemble final JSON from resampled points + optional overrides.
+export function prepareData(pts, opts = {}) {
+  const halfWidth = opts.halfWidth ?? 46
   const track = makeTrack(pts, { halfWidth })
   const boxes = []
   for (let k = 0; k < 6; k += 1) {
@@ -203,15 +211,43 @@ export function finalizeTrack(raw, opts = {}) {
       acc += len
     }
   }
-  const { pit, pitBoxes, warnings: pitWarnings } = autoPit(pts, halfWidth)
+  const auto = autoPit(pts, halfWidth)
+  const pit = opts.pit ?? auto.pit
+  const start = opts.start ?? track.start
+  const levels = opts.levels ?? pts.map(() => 0)
   const data = {
     name: opts.name || 'Custom Loop',
     points: pts.map(p => [Math.round(p[0] * 10) / 10, Math.round(p[1] * 10) / 10]),
     halfWidth,
     pit,
-    pitBoxes: pitBoxes.map(b => ({ x: Math.round(b.x), y: Math.round(b.y) })),
+    levels,
     boxes,
-    start: track.start,
+    start,
   }
-  return { ok: true, data, warnings: [...check.warnings, ...pitWarnings], total: track.total }
+  return { ok: true, data, warnings: [...(opts.warnings ?? []), ...auto.warnings], total: track.total }
+}
+
+// Snap a canvas click to the loop.
+export function snapToLoop(pts, x, y) {
+  let best = null
+  for (let i = 0; i < pts.length; i += 1) {
+    const a = pts[i], b = pts[(i + 1) % pts.length]
+    const abx = b[0] - a[0], aby = b[1] - a[1]
+    const t = Math.min(1, Math.max(0, ((x - a[0]) * abx + (y - a[1]) * aby) / ((abx * abx + aby * aby) || 1)))
+    const px = a[0] + abx * t, py = a[1] + aby * t
+    const d = Math.hypot(x - px, y - py)
+    if (!best || d < best.d) best = { d, x: px, y: py, angle: Math.atan2(aby, abx), seg: i }
+  }
+  return best
+}
+
+// Pit lane centered at a snapped point, pushed to one side of the ribbon.
+export function placePitAt(snap, halfWidth, side = 1) {
+  const nx = -Math.sin(snap.angle), ny = Math.cos(snap.angle)
+  return {
+    cx: Math.round(snap.x + nx * side * (halfWidth + 52)),
+    cy: Math.round(snap.y + ny * side * (halfWidth + 52)),
+    angle: snap.angle,
+    length: 620, width: 96,
+  }
 }

@@ -1,4 +1,4 @@
-import { HALF_WIDTH, WORLD_H, WORLD_W, buildDecor, buildTrack, pitBoxFor } from './track.js'
+import { WORLD_H, WORLD_W, buildDecor, buildTrack } from './track.js'
 import { SEAT_COLORS } from '../../server/sim.js'
 
 const TRACK = buildTrack()
@@ -27,9 +27,13 @@ export function renderRace(ctx, W, H, view, nowMs, track = TRACK) {
   drawPit(ctx, track)
   drawBoxes(ctx, view, track, nowMs)
   drawHazards(ctx, view)
-  drawVans(ctx, view, nowMs)
+  // depth: ground traffic, bridge decks, then bridge traffic on top
+  drawVans(ctx, view, nowMs, false)
   const cars = [...(view?.cars ?? [])].sort((a, b) => (b.finished ? 1 : 0) - (a.finished ? 1 : 0))
-  for (const car of cars) drawCar(ctx, view, car, nowMs)
+  for (const car of cars) if ((car.level ?? 0) <= 0) drawCar(ctx, view, car, nowMs)
+  drawBridges(ctx, track)
+  drawVans(ctx, view, nowMs, true)
+  for (const car of cars) if ((car.level ?? 0) > 0) drawCar(ctx, view, car, nowMs)
   ctx.restore()
   renderOverlays(ctx, W, H, view, nowMs)
 }
@@ -77,7 +81,8 @@ function drawGround(ctx, decor) {
 
 function drawTrack(ctx, track) {
   const pts = track.points
-  const w = HALF_WIDTH * 2
+  const hw = track.halfWidth
+  const w = hw * 2
   // white base, red dashed curb, asphalt, center dashes
   trackPath(ctx, pts)
   ctx.lineWidth = w + 18
@@ -101,6 +106,23 @@ function drawTrack(ctx, track) {
   ctx.setLineDash([24, 30])
   ctx.stroke()
   ctx.setLineDash([])
+  // tunnel tubes: dark cutaway over the base ribbon + portal rings
+  for (const run of levelRuns(track)) {
+    if (run.level >= 0) continue
+    runPath(ctx, track, run)
+    ctx.lineWidth = w + 6
+    ctx.strokeStyle = '#14141c'
+    ctx.setLineDash([])
+    ctx.stroke()
+    for (const end of [run.from, (run.to + 1) % pts.length]) {
+      const p = pts[end]
+      ctx.strokeStyle = '#ffd23f'
+      ctx.lineWidth = 4
+      ctx.beginPath()
+      ctx.arc(p[0], p[1], w / 2 + 4, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+  }
   // start/finish checker across the track at the start point
   ctx.save()
   ctx.translate(track.start.x, track.start.y)
@@ -108,10 +130,87 @@ function drawTrack(ctx, track) {
   for (let r = 0; r < 2; r += 1) {
     for (let i = 0; i < 10; i += 1) {
       ctx.fillStyle = (r + i) % 2 ? '#111' : '#fff'
-      ctx.fillRect(r * 8 - 8, -HALF_WIDTH + i * ((HALF_WIDTH * 2) / 10), 8, (HALF_WIDTH * 2) / 10)
+      ctx.fillRect(r * 8 - 8, -hw + i * ((hw * 2) / 10), 8, (hw * 2) / 10)
     }
   }
   ctx.restore()
+}
+
+// Consecutive segment runs sharing a level (for decks and tubes).
+export function levelRuns(track) {
+  const n = track.points.length
+  const runs = []
+  let start = 0
+  let lvl = track.levels?.[0] ?? 0
+  for (let i = 1; i <= n; i += 1) {
+    const l = track.levels?.[i % n] ?? 0
+    if (l !== lvl || i === n) {
+      runs.push({ level: lvl, from: start, to: i - 1 })
+      start = i
+      lvl = l
+    }
+  }
+  return runs
+}
+
+export function runPath(ctx, track, run) {
+  const pts = track.points
+  const n = pts.length
+  ctx.beginPath()
+  ctx.moveTo(pts[run.from][0], pts[run.from][1])
+  for (let i = run.from + 1; i <= run.to + 1; i += 1) {
+    const p = pts[i % n]
+    ctx.lineTo(p[0], p[1])
+  }
+}
+
+// Bridge decks render after ground traffic so cars underneath stay hidden.
+export function drawBridges(ctx, track) {
+  const w = track.halfWidth * 2
+  for (const run of levelRuns(track)) {
+    if (run.level <= 0) continue
+    const pts = track.points
+    // shadow
+    ctx.save()
+    ctx.translate(10, 14)
+    runPath(ctx, track, run)
+    ctx.lineWidth = w + 18
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)'
+    ctx.lineJoin = 'round'
+    ctx.setLineDash([])
+    ctx.stroke()
+    ctx.restore()
+    // deck + rails
+    runPath(ctx, track, run)
+    ctx.lineWidth = w + 10
+    ctx.strokeStyle = '#4a4a56'
+    ctx.lineJoin = 'round'
+    ctx.setLineDash([])
+    ctx.stroke()
+    runPath(ctx, track, run)
+    ctx.lineWidth = w
+    ctx.strokeStyle = '#3a3a44'
+    ctx.stroke()
+    runPath(ctx, track, run)
+    ctx.lineWidth = 3
+    ctx.strokeStyle = '#ffd23f'
+    ctx.setLineDash([18, 22])
+    ctx.stroke()
+    ctx.setLineDash([])
+    // support pillars every ~140px
+    ctx.fillStyle = '#2a2a34'
+    let acc = 0
+    for (let i = run.from; i <= run.to; i += 1) {
+      const a = pts[i % pts.length]
+      const b = pts[(i + 1) % pts.length]
+      const len = Math.hypot(b[0] - a[0], b[1] - a[1])
+      acc += len
+      if (acc >= 140) {
+        acc = 0
+        ctx.fillRect(a[0] - 7, a[1] - 2, 14, 22)
+      }
+    }
+  }
 }
 
 export function trackPath(ctx, points) {
@@ -122,25 +221,32 @@ export function trackPath(ctx, points) {
 }
 
 function drawPit(ctx, track) {
+  // Oriented lane along the track. Two rows of generous slots — anyone
+  // stopped anywhere in the lane gets serviced, no assigned boxes.
   const pit = track.pit
+  ctx.save()
+  ctx.translate(pit.cx, pit.cy)
+  ctx.rotate(pit.angle)
+  const L = pit.length, Wd = pit.width
   ctx.fillStyle = '#55555f'
-  ctx.fillRect(pit.x0, pit.y0, pit.x1 - pit.x0, pit.y1 - pit.y0)
+  ctx.fillRect(-L / 2, -Wd / 2, L, Wd)
   ctx.strokeStyle = '#ffd23f'
   ctx.lineWidth = 3
-  ctx.strokeRect(pit.x0, pit.y0, pit.x1 - pit.x0, pit.y1 - pit.y0)
-  ctx.fillStyle = '#9be9ff'
-  ctx.font = 'bold 16px monospace'
-  ctx.textAlign = 'center'
-  ctx.fillText('PIT LANE — STOP IN YOUR BOX', (pit.x0 + pit.x1) / 2, pit.y0 + 20)
-  for (let i = 0; i < 12; i += 1) {
-    const b = pitBoxFor(track, i)
-    ctx.strokeStyle = 'rgba(255,255,255,0.5)'
-    ctx.lineWidth = 2
-    ctx.strokeRect(b.x - b.w / 2, b.y - b.h / 2, b.w, b.h)
-    ctx.fillStyle = SEAT_COLORS[i % SEAT_COLORS.length]
-    ctx.font = '11px monospace'
-    ctx.fillText(String(i + 1), b.x, b.y + b.h / 2 + 13)
+  ctx.strokeRect(-L / 2, -Wd / 2, L, Wd)
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)'
+  ctx.lineWidth = 2
+  for (let row = 0; row < 2; row += 1) {
+    const y = -Wd / 4 + row * (Wd / 2)
+    for (let i = 0; i < 6; i += 1) {
+      const x = -L / 2 + 50 + (i * (L - 100)) / 5
+      ctx.strokeRect(x - 27, y - 36, 54, 72)
+    }
   }
+  ctx.fillStyle = '#9be9ff'
+  ctx.font = 'bold 18px monospace'
+  ctx.textAlign = 'center'
+  ctx.fillText('PIT — STOP ANYWHERE', 0, -Wd / 2 + 24)
+  ctx.restore()
 }
 
 function drawBoxes(ctx, view, track, nowMs) {
@@ -201,8 +307,9 @@ function drawHazards(ctx, view) {
   }
 }
 
-function drawVans(ctx, view, nowMs) {
+function drawVans(ctx, view, nowMs, onlyBridge) {
   for (const van of view?.vans ?? []) {
+    if (((van.level ?? 0) > 0) !== onlyBridge) continue
     ctx.save()
     ctx.translate(van.x, van.y)
     ctx.rotate(van.angle + (van.wobbling ? Math.sin(nowMs / 60) * 0.08 : 0))

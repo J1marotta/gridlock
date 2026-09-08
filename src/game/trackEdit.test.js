@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  autoPit, finalizeTrack, findPinches, rawLength, resampleClosed, segSegDist, smoothClosed, validateLoop,
+  autoPit, finalizeTrack, findPinches, placePitAt, prepareData, rawLength, resampleClosed, segSegDist, smoothClosed, snapToLoop, validateLoop,
 } from './trackEdit.js'
 import { makeTrack } from './track.js'
 
@@ -75,20 +75,35 @@ describe('studio geometry', () => {
     const res = finalizeTrack(roundedRect(800, 450, 900, 500, 120), { name: 'Test Oval' })
     expect(res.ok).toBe(true)
     expect(res.data.points.length).toBeGreaterThan(30)
-    expect(res.data.pitBoxes).toHaveLength(12)
+    expect(res.data.pit.cx).toBeDefined()
+    expect(res.data.pit.length).toBeGreaterThan(200)
     expect(res.data.boxes).toHaveLength(6)
     expect(res.data.start.angle).toBeDefined()
     const track = makeTrack(res.data.points, res.data)
     expect(track.total).toBeGreaterThan(1500)
-    expect(track.pitBoxes).toHaveLength(12)
+    expect(track.pit.length).toBeGreaterThan(200)
   })
 
   it('auto pit lands clear of the ribbon', () => {
     const pts = roundedRect(800, 450, 900, 500, 120)
-    const { pit, pitBoxes } = autoPit(pts, 46)
-    expect(pit.x1).toBeGreaterThan(pit.x0)
-    expect(pit.y1).toBeGreaterThan(pit.y0)
-    expect(pitBoxes).toHaveLength(12)
+    const { pit } = autoPit(pts, 46)
+    expect(pit.length).toBeGreaterThan(200)
+    expect(pit.width).toBeGreaterThan(60)
+  })
+
+  it('placement tools snap pit and start to the loop', () => {
+    const pts = roundedRect(800, 450, 900, 500, 120)
+    const snap = snapToLoop(pts, 800, 150)
+    expect(snap.d).toBeLessThan(60)
+    const pit = placePitAt(snap, 46, 1)
+    expect(pit.length).toBe(620)
+    // pit sits off the ribbon, start sits on it
+    expect(Math.hypot(pit.cx - snap.x, pit.cy - snap.y)).toBeGreaterThan(46)
+    const start = { x: snap.x, y: snap.y, angle: snap.angle }
+    const res = prepareData(pts, { pit, start, name: 'Placed' })
+    expect(res.ok).toBe(true)
+    expect(res.data.start.x).toBe(snap.x)
+    expect(res.data.pit.cx).toBe(pit.cx)
   })
 
   it('a finalized custom track hosts a full AI race', async () => {

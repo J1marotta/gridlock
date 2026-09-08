@@ -2,7 +2,7 @@
 // Reads the tune object every tick, so the admin panel (~) changes the live game.
 import {
   WORLD_H, WORLD_W,
-  buildTrack, closestOnTrack, gateAt, gridSlot, inPitBox, inPitZone, pitBoxFor, pointAhead,
+  buildTrack, closestOnTrack, closestOnTrackLevel, gateAt, gridSlot, inPitZone, levelAt, pitCenter, pointAhead,
 } from '../src/game/track.js'
 import { cloneTune } from '../src/game/tune.js'
 
@@ -69,6 +69,7 @@ export function addCar(race, { playerId, name, color, isNpc, seat }) {
     seat, playerId, name, color, isNpc: Boolean(isNpc),
     x: slot.x, y: slot.y, angle: slot.angle, vx: 0, vy: 0,
     along: info.along, lastAlong: info.along, alongU: info.along,
+    seg: info.seg, level: levelAt(race.track, info.seg),
     lap: 1, nextGate: 0, looped: false, progress: 0, place: seat + 1,
     wear: 0, item: '', itemHeldMs: 0,
     boostUntil: 0, shieldUntil: 0, zapUntil: 0, spinUntil: 0, spinDir: 1,
@@ -194,7 +195,7 @@ function stepCar(race, car, dt) {
     if (car.pitState === 'crew') {
       car.pitNeedleT += dt * tune.pit.needleSpeed
       if (now >= car.pitAutoAt) resolvePit(race, car, 'slow', true)
-      else if (!inPitBox(race.track, car.seat, car.x, car.y)) {
+      else if (!inPitZone(race.track, car.x, car.y)) {
         car.pitState = 'none'
         logEvent(race, 'pit', `${car.name} jumped the crew — no change!`, car.seat)
       }
@@ -217,7 +218,9 @@ function stepCar(race, car, dt) {
   let topMul = (1 - wearFrac * tune.tires.topLoss) * tune.car.topMul
   if (car.wear >= 100) topMul *= tune.tires.baldCap
 
-  const info = closestOnTrack(race.track, car.x, car.y)
+  const info = closestOnTrackLevel(race.track, car.x, car.y, car.seg)
+  car.seg = info.seg
+  car.level = levelAt(race.track, info.seg)
   const off = info.dist > race.track.halfWidth
   let top = BASE_TOP * topMul
   if (off) top *= tune.car.offTopMul
@@ -272,8 +275,11 @@ function stepCar(race, car, dt) {
   car.x = clamp(car.x, 20, WORLD_W - 20)
   car.y = clamp(car.y, 20, WORLD_H - 20)
 
-  // walls: push back inside, scrub outward velocity
-  const w = closestOnTrack(race.track, car.x, car.y)
+  // walls: push back inside, scrub outward velocity (level-aware: bridges
+  // don't collide with the road passing underneath)
+  const w = closestOnTrackLevel(race.track, car.x, car.y, car.seg)
+  car.seg = w.seg
+  car.level = levelAt(race.track, w.seg)
   const maxD = race.track.halfWidth + 14
   if (w.dist > maxD && !inPitZone(race.track, car.x, car.y)) {
     const nx = (car.x - w.px) / (w.dist || 1)
@@ -319,8 +325,8 @@ function stepCar(race, car, dt) {
     if (Math.hypot(car.x - hz.x, car.y - hz.y) < CAR_R + 13) hitHazard(race, car, hz)
   }
 
-  // pit boxes: stop inside yours and the crew runs out (once per visit)
-  if (car.pitState === 'none' && car.pitArmed && inPitBox(race.track, car.seat, car.x, car.y)) {
+  // pit lane: stop anywhere in it and the crew runs out (once per visit)
+  if (car.pitState === 'none' && car.pitArmed && inPitZone(race.track, car.x, car.y)) {
     if (Math.hypot(car.vx, car.vy) < 30) {
       car.pitHoldMs += dt * 1000
       if (car.pitHoldMs >= tune.pit.boxHoldMs) {
@@ -334,7 +340,7 @@ function stepCar(race, car, dt) {
     }
   } else if (car.pitState === 'none') {
     car.pitHoldMs = 0
-    if (!inPitBox(race.track, car.seat, car.x, car.y)) car.pitArmed = true
+    if (!inPitZone(race.track, car.x, car.y)) car.pitArmed = true
   }
 }
 
@@ -364,11 +370,14 @@ function stepVan(race, van, dt) {
   van.speed += ((tune.traffic.speed * wob) - van.speed) * Math.min(1, 2 * dt)
   van.x += Math.cos(van.angle) * van.speed * dt
   van.y += Math.sin(van.angle) * van.speed * dt
-  const info = closestOnTrack(race.track, van.x, van.y)
+  const info = closestOnTrackLevel(race.track, van.x, van.y, van.seg ?? 0)
+  van.seg = info.seg
+  van.level = levelAt(race.track, info.seg)
   van.along = info.along
-  // bump racers
+  // bump racers (same deck only — bridges pass overhead)
   for (const car of race.cars) {
     if (car.finished) continue
+    if (car.level !== van.level) continue
     if (Math.hypot(car.x - van.x, car.y - van.y) < CAR_R + VAN_R) {
       const nx = (car.x - van.x) / (Math.hypot(car.x - van.x, car.y - van.y) || 1)
       const ny = (car.y - van.y) / (Math.hypot(car.x - van.x, car.y - van.y) || 1)
@@ -388,6 +397,7 @@ function collideCars(race) {
     for (let j = i + 1; j < cars.length; j += 1) {
       const a = cars[i], b = cars[j]
       if (a.finished || b.finished) continue
+      if (a.level !== b.level) continue
       const dx = b.x - a.x, dy = b.y - a.y
       const d = Math.hypot(dx, dy)
       if (d > 0 && d < CAR_R * 2) {
@@ -417,7 +427,7 @@ function syncTraffic(race) {
     const p = pointAhead(race.track, along, 0)
     race.vans.push({
       id: i + 1, x: p.x, y: p.y, angle: 0, speed: 0,
-      along, side: i % 2 === 0 ? -1 : 1, wobbleUntil: 0,
+      along, seg: 0, level: 0, side: i % 2 === 0 ? -1 : 1, wobbleUntil: 0,
     })
   }
   if (race.vans.length > want) race.vans.length = want
@@ -430,9 +440,9 @@ export function aiInput(race, car) {
   let tx, ty
   let creep = false
   if (car.wear > 82) {
-    const box = pitBoxFor(race.track, car.seat)
+    const box = pitCenter(race.track)
     const dBox = Math.hypot(box.x - car.x, box.y - car.y)
-    if (dBox < 500 || inPitZone(race.track, car.x, car.y)) {
+    if (dBox < 600 || inPitZone(race.track, car.x, car.y)) {
       tx = box.x
       ty = box.y
       creep = dBox < 60
@@ -440,9 +450,15 @@ export function aiInput(race, car) {
   }
   if (tx === undefined) {
     if (inPitZone(race.track, car.x, car.y)) {
-      // just serviced (or cut through): rejoin at the pit exit, don't u-turn into the wall
-      tx = 1060
-      ty = 740
+      // just serviced (or cut through): rejoin past the pit exit along the
+      // track direction instead of u-turning
+      const near = closestOnTrack(race.track, race.track.pit.cx, race.track.pit.cy)
+      const p0 = race.track.points[near.seg]
+      const p1 = race.track.points[(near.seg + 1) % race.track.points.length]
+      const dl = Math.hypot(p1[0] - p0[0], p1[1] - p0[1]) || 1
+      const reach = race.track.pit.length / 2 + 120
+      tx = race.track.pit.cx + ((p1[0] - p0[0]) / dl) * reach
+      ty = race.track.pit.cy + ((p1[1] - p0[1]) / dl) * reach
     } else {
       const p = pointAhead(race.track, car.along + lookahead, 0)
       tx = p.x
