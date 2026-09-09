@@ -163,7 +163,6 @@ export class GridRoom extends Room {
     if (!this.isHost(player)) return { ok: false, error: 'host-only', message: 'Only the host picks the track' }
     const verify = trackFromData(track)
     if (!verify.ok) return { ok: false, error: 'invalid', message: verify.error }
-    // rebuild canonical data (resampled boxes/start derived server-side)
     this.pendingTrackData = {
       name: String(track.name || 'Custom Loop').slice(0, 24),
       points: verify.track.points,
@@ -270,7 +269,6 @@ export class GridRoom extends Room {
 
   syncWorld(nowMs) {
     if (!this.race) return
-    // cars
     for (const car of this.race.cars) {
       let s = this.state.cars.get(String(car.seat))
       if (!s) {
@@ -297,7 +295,6 @@ export class GridRoom extends Room {
       s.spinning = nowMs < car.spinUntil
       s.finished = car.finished
     }
-    // hazards
     const hzIds = new Set()
     for (const hz of this.race.hazards) {
       hzIds.add(String(hz.id))
@@ -314,7 +311,6 @@ export class GridRoom extends Room {
     for (const key of this.state.hazards.keys()) {
       if (!hzIds.has(key)) this.state.hazards.delete(key)
     }
-    // vans
     const vanIds = new Set()
     for (const van of this.race.vans) {
       vanIds.add(String(van.id))
@@ -333,7 +329,6 @@ export class GridRoom extends Room {
     for (const key of this.state.vans.keys()) {
       if (!vanIds.has(key)) this.state.vans.delete(key)
     }
-    // boxes
     this.race.track.boxes.forEach((b, i) => {
       let s = this.state.boxes.get(String(i))
       if (!s) {
@@ -357,7 +352,6 @@ export class GridRoom extends Room {
     }
     stepRace(this.race, deltaMs / 1000, nowMs)
     this.state.phase = this.race.phase
-    // lap times
     for (const car of this.race.cars) {
       const seen = this.lastLapSeen.get(car.seat) ?? 1
       if (car.lap > seen) {
@@ -373,9 +367,7 @@ export class GridRoom extends Room {
         this.lastLapAt.set(car.seat, nowMs)
       }
     }
-    // cars
     this.syncWorld(nowMs)
-    // winner + feed
     if (this.race.winnerSeat !== -1) {
       const w = this.race.cars.find(c => c.seat === this.race.winnerSeat)
       this.state.winnerSeat = this.race.winnerSeat
@@ -414,7 +406,7 @@ export class GridRoom extends Room {
     this.lastSequenceByPlayerId.delete(left)
     this.inputByPlayerId.delete(left)
     if (left) this.state.players.delete(left)
-    if (hostLeft) await this.closeAfterHostDeparture()
+    if (hostLeft) await this.closeRoom('host-left', 'Host left')
     else if (this.state.players.size === 0) await this.closeRoom('empty', 'Room empty')
   }
 
@@ -441,8 +433,6 @@ export class GridRoom extends Room {
     if (hostLeft) this.state.hostPlayerId = ''
     return hostLeft
   }
-
-  async closeAfterHostDeparture() { await this.closeRoom('host-left', 'Host left') }
 
   async closeRoom(reason, message) {
     if (this.closing) return

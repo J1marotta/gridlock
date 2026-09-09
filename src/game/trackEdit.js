@@ -1,14 +1,11 @@
-// Paint-studio geometry: turn a freehand brush stroke into a raceable loop.
-// The brush paints a CENTERLINE; the ribbon preview shows the track width.
-// finalizeTrack() produces the JSON that makeTrack()/test-drive consumes.
-import { WORLD_H, WORLD_W, makeTrack } from './track.js'
+// Paint-studio geometry: brush stroke -> raceable loop.
+import { WORLD_H, WORLD_W, makeTrack, pointAhead } from './track.js'
 
 const dist2 = (a, b) => {
   const dx = a[0] - b[0], dy = a[1] - b[1]
   return dx * dx + dy * dy
 }
 
-// Chaikin corner-cutting on a closed loop. Kills brush jitter, keeps shape.
 export function smoothClosed(points, iterations = 2) {
   let pts = points.map(p => [...p])
   for (let k = 0; k < iterations; k += 1) {
@@ -32,7 +29,6 @@ export function rawLength(points) {
   return total
 }
 
-// Evenly spaced points every `step` px around the closed loop.
 export function resampleClosed(points, step = 18) {
   const total = rawLength(points)
   const count = Math.max(8, Math.round(total / step))
@@ -55,7 +51,6 @@ export function resampleClosed(points, step = 18) {
   return out.slice(0, count)
 }
 
-// Distance between segments p1-p2 and p3-p4.
 export function segSegDist(p1, p2, p3, p4) {
   const d1x = p2[0] - p1[0], d1y = p2[1] - p1[1]
   const d2x = p4[0] - p3[0], d2y = p4[1] - p3[1]
@@ -78,8 +73,6 @@ export function segSegDist(p1, p2, p3, p4) {
   return Math.min(ptSeg(p1, p3, p4), ptSeg(p2, p3, p4), ptSeg(p3, p1, p2), ptSeg(p4, p1, p2))
 }
 
-// Segment pairs that are close in space but far apart along the loop —
-// genuine overlaps, not tight bends (those are close in arclength too).
 export function findPinches(points, halfWidth) {
   const n = points.length
   const cum = [0]
@@ -126,8 +119,6 @@ export function clearanceAt(points, halfWidth, x, y) {
   return best - halfWidth
 }
 
-// Pit lane alongside the longest straight, on whichever side has room.
-// Oriented with the track; service is zone-based anywhere in the lane.
 export function autoPit(points, halfWidth) {
   let best = { len: -1, i: 0 }
   for (let i = 0; i < points.length; i += 1) {
@@ -180,8 +171,6 @@ export function validateLoop(points, halfWidth) {
   return { errors, warnings, total, pinches }
 }
 
-// Raw brush stroke -> raceable track JSON (or errors). Callers may override
-// pit/start afterwards (studio placement modes) and re-run prepareData().
 export function finalizeTrack(raw, opts = {}) {
   const halfWidth = opts.halfWidth ?? 46
   const smoothed = smoothClosed(raw, 2)
@@ -201,18 +190,8 @@ export function prepareData(pts, opts = {}) {
   const track = makeTrack(pts, { halfWidth })
   const boxes = []
   for (let k = 0; k < 6; k += 1) {
-    const a = (track.total * (k + 0.5)) / 6
-    let acc = 0
-    for (let i = 0; i < pts.length; i += 1) {
-      const p = pts[i], q = pts[(i + 1) % pts.length]
-      const len = Math.hypot(q[0] - p[0], q[1] - p[1])
-      if (a >= acc && a <= acc + len) {
-        const t = len ? (a - acc) / len : 0
-        boxes.push({ x: p[0] + (q[0] - p[0]) * t, y: p[1] + (q[1] - p[1]) * t })
-        break
-      }
-      acc += len
-    }
+    const p = pointAhead(track, (track.total * (k + 0.5)) / 6, 0)
+    boxes.push({ x: p.x, y: p.y })
   }
   const auto = autoPit(pts, halfWidth)
   const pit = opts.pit ?? auto.pit
@@ -230,7 +209,6 @@ export function prepareData(pts, opts = {}) {
   return { ok: true, data, warnings: [...(opts.warnings ?? []), ...auto.warnings], total: track.total }
 }
 
-// Snap a canvas click to the loop.
 export function snapToLoop(pts, x, y) {
   let best = null
   for (let i = 0; i < pts.length; i += 1) {
@@ -244,7 +222,6 @@ export function snapToLoop(pts, x, y) {
   return best
 }
 
-// Pit lane centered at a snapped point, pushed to one side of the ribbon.
 export function placePitAt(snap, halfWidth, side = 1) {
   const nx = -Math.sin(snap.angle), ny = Math.cos(snap.angle)
   return {

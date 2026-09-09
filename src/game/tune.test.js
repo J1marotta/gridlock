@@ -46,6 +46,6 @@ describe('tune system', () => {
     const a = cloneTune()
     const b = cloneTune()
     a.car.grip = 1
-    expect(b.car.grip).not.toBe(1)
+    expect(b.car.grip).toBe(TUNE_DEFAULTS.car.grip)
   })
 })

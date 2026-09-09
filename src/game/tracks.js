@@ -1,11 +1,8 @@
-// Premade track library. Speedway (big circle) is the default; Riverside is
-// the original hand-built loop. All entries validate and host full AI races
-// in tracks.test.js — nothing ships unraceable.
+// Premade track library. Speedway is the default.
 import { makeTrack } from './track.js'
 import { prepareData } from './trackEdit.js'
 
 function circlePoints(cx, cy, r, n = 64, startAngle = Math.PI / 2) {
-  // sweep decreasing angle so the start heads east along the bottom
   return Array.from({ length: n }, (_, i) => {
     const a = startAngle - (i / n) * Math.PI * 2
     return [cx + Math.cos(a) * r, cy + Math.sin(a) * r]
@@ -55,7 +52,6 @@ export function getTrackData(id) {
   return TRACKS.find(t => t.id === id) ?? TRACKS[0]
 }
 
-// Runtime object (cached per id).
 const cache = new Map()
 export function getTrack(id) {
   if (!cache.has(id)) {

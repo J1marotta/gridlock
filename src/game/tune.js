@@ -1,6 +1,4 @@
-// Live-tunable variables. The admin panel (~) edits these; in multiplayer the
-// host's edits are broadcast and applied mid-race. The sim reads them every
-// tick, so everything here is adjustable in real time.
+// Live-tunable variables, read by the sim every tick.
 export const TUNE_DEFAULTS = {
   race: { laps: 3, countdownMs: 3600, winnerGraceMs: 25000, timeLimitMs: 300000 },
   car: { topMul: 1, accel: 175, brakePow: 280, reverseTop: 70, steerRate: 2.7, grip: 7.5, offTopMul: 0.55 },
@@ -14,7 +12,6 @@ export const TUNE_DEFAULTS = {
   pit: { speedLimit: 150, boxHoldMs: 400, crewBaseMs: 1000, perfectMs: 600, okMs: 1600, slowMs: 3000, perfectHalf: 0.06, okHalf: 0.18, needleSpeed: 1.7 },
 }
 
-// path -> editor metadata. Anything not listed here can't be set remotely.
 export const TUNE_META = {
   'race.laps': { label: 'Laps', min: 1, max: 9, step: 1 },
   'race.countdownMs': { label: 'Countdown (ms)', min: 1000, max: 10000, step: 500 },
@@ -79,7 +76,6 @@ export function setByPath(tune, path, value) {
   return true
 }
 
-// Applies { 'path.to.var': value } — used by the admin panel and the TUNE command.
 export function applyPatch(tune, patch) {
   let applied = 0
   for (const [path, value] of Object.entries(patch ?? {})) {

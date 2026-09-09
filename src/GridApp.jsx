@@ -3,16 +3,13 @@ import { ColyseusTransport, getColyseusEndpoint } from './multiplayer/colyseusTr
 import { normalizeRoomCode, randomRoomCode } from './multiplayer/protocol.js'
 import { SEAT_COLORS } from '../server/sim.js'
 import { applyPatch, cloneTune } from './game/tune.js'
-import { renderRace } from './game/raceCanvas.js'
+import { renderRace, ITEM_GLYPH, ITEM_LABEL } from './game/raceCanvas.js'
 import { GridAudio } from './game/audio.js'
 import { LocalRace } from './game/localRace.js'
 import AdminPanel from './game/AdminPanel.jsx'
 import TrackStudio, { STUDIO_SLOTS } from './game/TrackStudio.jsx'
 import { TRACKS, getTrackData } from './game/tracks.js'
 import { trackFromData } from './game/track.js'
-
-const ITEM_GLYPH = { boost: '🚀', oil: '🛢' }
-const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL SPILL' }
 
 function useTransport() {
   const ref = useRef(null)
@@ -60,12 +57,10 @@ export default function GridApp() {
   const [adminOpen, setAdminOpen] = useState(false)
   const [soloTrack, setSoloTrack] = useState(() => localStorage.getItem('gridlock-track') || 'speedway')
   const [hostTrack, setHostTrack] = useState('speedway')
-  // solo state
   const localRef = useRef(null)
   const localTuneRef = useRef(null)
   const [localVersion, setLocalVersion] = useState(0)
   const [netTune, setNetTune] = useState(() => cloneTune())
-  // driving keys
   const keysRef = useRef({ up: false, down: false, left: false, right: false })
   const lastInputSent = useRef('')
   const lastCount = useRef(-1)
@@ -80,7 +75,6 @@ export default function GridApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot, privateState, netTune, mode, localVersion])
 
-  // multiplayer track comes down as JSON (premade or host studio upload)
   const netTrackJson = mode === 'net' ? snapshot?.trackJson : null
   const netTrack = useMemo(() => {
     if (!netTrackJson) return undefined
@@ -162,7 +156,7 @@ export default function GridApp() {
       const car = localRef.current?.race.cars[0]
       if (car?.pitState === 'crew') audioRef.current.pit()
       else if (car?.item) audioRef.current.pickup()
-      localRef.current?.pressSpace(Date.now())
+      localRef.current?.pressSpace()
     } else {
       if (localCar?.pit === 'crew') {
         audioRef.current.pit()
@@ -174,7 +168,6 @@ export default function GridApp() {
     }
   }
 
-  // keys: arrows/WASD drive, Space item/pit, `~` admin
   useEffect(() => {
     const racing = screen === 'countdown' || screen === 'racing'
     const down = e => {
@@ -215,7 +208,6 @@ export default function GridApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [screen, mode, snapshot, privateState])
 
-  // solo 20Hz loop
   useEffect(() => {
     if (mode !== 'local' || !localRef.current) return undefined
     const id = setInterval(() => {
@@ -273,44 +265,33 @@ export default function GridApp() {
     return getTrackData(ref).data
   }
 
-  function startSolo() {
+  function launchSolo(trackData, { freshTune = false } = {}) {
     audioRef.current.ensure()
     localStorage.setItem('gridlock-name', name)
+    if (freshTune || !localTuneRef.current) localTuneRef.current = cloneTune()
+    localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: localTuneRef.current, trackData })
+    localRef.current.soloTrackData = trackData
+    localRef.current.start()
+    keysRef.current = { up: false, down: false, left: false, right: false }
+    lastInputSent.current = ''
+    setMode('local')
+    setError('')
+    setScreen('countdown')
+  }
+
+  function startSolo() {
     const data = resolveTrackData(soloTrack)
     localStorage.setItem('gridlock-track', soloTrack)
     localTuneRef.current = cloneTune()
-    localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: localTuneRef.current, trackData: data })
-    localRef.current.soloTrackData = data
-    localRef.current.start()
-    keysRef.current = { up: false, down: false, left: false, right: false }
-    lastInputSent.current = ''
-    setMode('local')
-    setError('')
-    setScreen('countdown')
+    launchSolo(data)
   }
 
   function soloRematch() {
-    const t = localTuneRef.current ?? cloneTune()
-    const custom = localRef.current?.soloTrackData ?? localRef.current?.customTrack ?? null
-    localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: t, trackData: custom })
-    localRef.current.soloTrackData = custom
-    localRef.current.start()
-    setScreen('countdown')
+    launchSolo(localRef.current?.soloTrackData ?? null)
   }
 
   function testDrive(trackData) {
-    audioRef.current.ensure()
-    localStorage.setItem('gridlock-name', name)
-    const t = localTuneRef.current ?? cloneTune()
-    localTuneRef.current = t
-    localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: t, trackData })
-    localRef.current.customTrack = trackData
-    localRef.current.start()
-    keysRef.current = { up: false, down: false, left: false, right: false }
-    lastInputSent.current = ''
-    setMode('local')
-    setError('')
-    setScreen('countdown')
+    launchSolo(trackData)
   }
 
   async function doLeave() {
@@ -472,7 +453,7 @@ export default function GridApp() {
       </div>
       <AdminPanel
         tune={tune} open={adminOpen} canEdit={canTune}
-        onClose={() => setAdminOpen(false)} onPatch={onPatch} onReset={onPatch}
+        onClose={() => setAdminOpen(false)} onPatch={onPatch}
       />
     </div>
   )
@@ -524,17 +505,20 @@ function RaceCanvas({ view, audio, mySeat, track }) {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
     let raf = 0
+    let wasBoosting = false
+    let wasSpinning = false
+    let lastItem = ''
     const loop = () => {
       renderRace(ctx, canvas.width, canvas.height, viewRef.current, performance.now(), trackRef.current)
       const local = viewRef.current?.cars.find(c => c.seat === (viewRef.current?.localSeat ?? mySeat))
       if (local) {
         audio.engine(local.speed, viewRef.current.phase === 'racing')
-        if (local.boosting && !loop._b) audio.boost()
-        loop._b = local.boosting
-        if (local.spinning && !loop._s) audio.spin()
-        loop._s = local.spinning
-        if (local.item && !loop._i) audio.pickup()
-        loop._i = local.item
+        if (local.boosting && !wasBoosting) audio.boost()
+        wasBoosting = local.boosting
+        if (local.spinning && !wasSpinning) audio.spin()
+        wasSpinning = local.spinning
+        if (local.item && local.item !== lastItem) audio.pickup()
+        lastItem = local.item
       }
       raf = requestAnimationFrame(loop)
     }

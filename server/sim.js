@@ -1,5 +1,4 @@
 // Gridlock authoritative sim. Shared by the Colyseus room and solo mode.
-// Reads the tune object every tick, so the admin panel (~) changes the live game.
 import {
   WORLD_H, WORLD_W,
   buildTrack, closestOnTrack, closestOnTrackLevel, gateAt, gridSlot, inPitZone, levelAt, pitCenter, pointAhead,
@@ -51,7 +50,6 @@ export function createRace(tune = cloneTune(), trackOverride = null) {
 
 export function logEvent(race, kind, text, seat = -1) {
   race.events.push({ kind, text, seat, at: race.now })
-  // Keep the feed bounded but never drop a win announcement.
   while (race.events.length > 40) {
     const idx = race.events.findIndex(e => e.kind !== 'win')
     if (idx === -1) race.events.shift()
@@ -67,7 +65,7 @@ export function addCar(race, { playerId, name, color, isNpc, seat }) {
     x: slot.x, y: slot.y, angle: slot.angle, vx: 0, vy: 0,
     along: info.along, lastAlong: info.along, alongU: info.along,
     seg: info.seg, level: levelAt(race.track, info.seg),
-    lap: 1, nextGate: 0, looped: false, progress: 0, place: seat + 1,
+    lap: 1, nextGate: 1, looped: false, progress: 0, place: seat + 1, // grid sits in gate 11; opening crossing must not count
     wear: 0, item: '', itemHeldMs: 0,
     boostUntil: 0, spinUntil: 0, spinDir: 1,
     pitState: 'none', pitHoldMs: 0, pitNeedleT: 0, pitWorkMs: 0, pitAutoAt: 0, pitGrade: '',
@@ -76,8 +74,6 @@ export function addCar(race, { playerId, name, color, isNpc, seat }) {
     input: { steer: 0, throttle: 0 },
     aiPitTarget: false,
   }
-  // Grid sits in gate 11 heading for gate 0; the opening crossing must not count.
-  car.nextGate = 1
   race.cars.push(car)
   return car
 }
@@ -111,7 +107,6 @@ function rollItem(race, rank) {
     total += w
     return w
   })
-  if (total <= 0) return ''
   let r = Math.random() * total
   for (let i = 0; i < opts.length; i += 1) {
     r -= weights[i]
@@ -157,7 +152,6 @@ function stepCar(race, car, dt) {
   const now = race.now
   if (car.finished) return
 
-  // --- pit crew sequence locks the car ---
   if (car.pitState === 'crew' || car.pitState === 'working') {
     car.vx *= 1 - Math.min(1, 10 * dt)
     car.vy *= 1 - Math.min(1, 10 * dt)
@@ -165,7 +159,7 @@ function stepCar(race, car, dt) {
     car.y += car.vy * dt
     if (car.pitState === 'crew') {
       car.pitNeedleT += dt * tune.pit.needleSpeed
-      if (now >= car.pitAutoAt) resolvePit(race, car, 'slow', true)
+      if (now >= car.pitAutoAt) resolvePit(race, car, true)
       else if (!inPitZone(race.track, car.x, car.y)) {
         car.pitState = 'none'
         logEvent(race, 'pit', `${car.name} jumped the crew — no change!`, car.seat)
@@ -230,7 +224,6 @@ function stepCar(race, car, dt) {
   car.vx = ndx * vf + vlx
   car.vy = ndy * vf + vly
 
-  // pit speed limit
   if (inPitZone(race.track, car.x, car.y)) {
     const sp = Math.hypot(car.vx, car.vy)
     if (sp > tune.pit.speedLimit) {
@@ -245,8 +238,7 @@ function stepCar(race, car, dt) {
   car.x = clamp(car.x, 20, WORLD_W - 20)
   car.y = clamp(car.y, 20, WORLD_H - 20)
 
-  // walls: push back inside, scrub outward velocity (level-aware: bridges
-  // don't collide with the road passing underneath)
+  // Level-aware walls: a bridge never collides with the road underneath.
   const w = closestOnTrackLevel(race.track, car.x, car.y, car.seg)
   car.seg = w.seg
   car.level = levelAt(race.track, w.seg)
@@ -273,7 +265,6 @@ function stepCar(race, car, dt) {
   updateGates(race, car)
   car.progress = car.lap * race.track.total + (car.alongU - Math.floor(car.alongU / race.track.total) * race.track.total)
 
-  // item boxes
   if (!car.item) {
     for (let i = 0; i < race.boxes.length; i += 1) {
       const b = race.track.boxes[i]
@@ -289,13 +280,11 @@ function stepCar(race, car, dt) {
     }
   }
 
-  // hazards
   for (const hz of race.hazards) {
     if (hz.until <= race.now) continue
     if (Math.hypot(car.x - hz.x, car.y - hz.y) < CAR_R + 13) hitHazard(race, car, hz)
   }
 
-  // pit lane: stop anywhere in it and the crew runs out (once per visit)
   if (car.pitState === 'none' && car.pitArmed && inPitZone(race.track, car.x, car.y)) {
     if (Math.hypot(car.vx, car.vy) < 30) {
       car.pitHoldMs += dt * 1000
@@ -314,8 +303,7 @@ function stepCar(race, car, dt) {
   }
 }
 
-// The nitro-style timing release: press SPACE with the needle centered.
-export function resolvePit(race, car, _via, auto = false) {
+export function resolvePit(race, car, auto = false) {
   const t = race.tune.pit
   const pos = (car.pitNeedleT % 1 + 1) % 1
   const err = Math.abs(pos - 0.5)
@@ -326,7 +314,6 @@ export function resolvePit(race, car, _via, auto = false) {
   car.pitGrade = grade
   car.pitWorkMs = t.crewBaseMs + extra
   car.pitState = 'working'
-  void _via
 }
 
 function stepVan(race, van, dt) {
@@ -344,7 +331,6 @@ function stepVan(race, van, dt) {
   van.seg = info.seg
   van.level = levelAt(race.track, info.seg)
   van.along = info.along
-  // bump racers (same deck only — bridges pass overhead)
   for (const car of race.cars) {
     if (car.finished) continue
     if (car.level !== van.level) continue
@@ -404,6 +390,7 @@ function syncTraffic(race) {
 }
 
 // Simple bot brain: chase the racing line, brake for big turns, pit when bald, spend items.
+// Simple bot brain: chase the racing line, brake for big turns, pit when bald, spend items.
 export function aiInput(race, car) {
   if (car.pitState !== 'none') return { steer: 0, throttle: 0 }
   const lookahead = 90 + Math.hypot(car.vx, car.vy) * 0.35
@@ -420,8 +407,7 @@ export function aiInput(race, car) {
   }
   if (tx === undefined) {
     if (inPitZone(race.track, car.x, car.y)) {
-      // just serviced (or cut through): rejoin past the pit exit along the
-      // track direction instead of u-turning
+      // Rejoin past the pit exit instead of u-turning.
       const near = closestOnTrack(race.track, race.track.pit.cx, race.track.pit.cy)
       const p0 = race.track.points[near.seg]
       const p1 = race.track.points[(near.seg + 1) % race.track.points.length]
@@ -439,7 +425,6 @@ export function aiInput(race, car) {
   const diff = angDiff(car.angle, want)
   const sp = Math.hypot(car.vx, car.vy)
   if (sp < 30 && Math.abs(diff) > 2.2) {
-    // wedged facing away: back out while turning
     return { steer: clamp(diff * 2.4, -1, 1), throttle: -0.7 }
   }
   if (creep) {
@@ -483,22 +468,19 @@ export function stepRace(race, dt, nowMs) {
       const ai = aiInput(race, car)
       car.input.steer = ai.steer
       car.input.throttle = ai.throttle
-      // bot crew auto-release with human-ish timing spread
+      // Bots release with a human-ish timing spread.
       if (car.pitState === 'crew' && nowMs >= (car.pitAutoAt - 5000) + 600 + (car.seat * 137) % 900) {
-        resolvePit(race, car, 'bot')
+        resolvePit(race, car)
       }
       aiItems(race, car)
     }
-    // crew timing press for humans is routed via pressPit() below
     stepCar(race, car, dt)
   }
   for (const van of race.vans) stepVan(race, van, dt)
   collideCars(race)
 
-  // expiry
   race.hazards = race.hazards.filter(h => h.until > nowMs)
 
-  // places
   const ranked = [...race.cars].sort((a, b) => {
     if (a.finished && b.finished) return a.finishTimeMs - b.finishTimeMs
     if (a.finished !== b.finished) return a.finished ? -1 : 1
@@ -524,10 +506,9 @@ export function stepRace(race, dt, nowMs) {
   }
 }
 
-// SPACE during the crew phase: the nitro-style timing release.
 export function pressPit(race, car) {
   if (car.pitState === 'crew') {
-    resolvePit(race, car, 'human')
+    resolvePit(race, car)
     return true
   }
   return false

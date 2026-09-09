@@ -1,5 +1,4 @@
-// Solo mode: the authoritative sim running locally. Same physics, bots, pits,
-// items and live tune as multiplayer — no server needed.
+// Solo mode: the authoritative sim running locally.
 import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from '../../server/sim.js'
 import { trackFromData } from './track.js'
 import { getTrackData } from './tracks.js'
@@ -35,7 +34,6 @@ export class LocalRace {
     if (car && !car.finished) car.input = { steer, throttle }
   }
 
-  // SPACE does whatever matters right now: crew timing release, else item.
   pressSpace() {
     const car = this.race.cars[0]
     if (!car || this.race.phase !== 'racing') return false

@@ -33,8 +33,7 @@ const isNum = value => typeof value === 'number' && Number.isFinite(value)
 const payloadValidators = {
   [CLIENT_MESSAGE_TYPES.RENAME]: p => isNonEmptyString(p.nextPlayerName),
   [CLIENT_MESSAGE_TYPES.SETTINGS]: p =>
-    (!hasOwn(p, 'privacy') || ROOM_PRIVACY.includes(p.privacy)) &&
-    (hasOwn(p, 'privacy')),
+    hasOwn(p, 'privacy') && ROOM_PRIVACY.includes(p.privacy),
   [CLIENT_MESSAGE_TYPES.READY]: p => typeof p.ready === 'boolean',
   [CLIENT_MESSAGE_TYPES.START]: () => true,
   [CLIENT_MESSAGE_TYPES.INPUT]: p =>

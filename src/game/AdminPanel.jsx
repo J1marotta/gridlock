@@ -15,8 +15,8 @@ function flatten(obj, prefix = '') {
   )
 }
 
-// The `~` panel: every tunable, live. Edits go straight into a running race.
-export default function AdminPanel({ tune, onPatch, onReset, canEdit, open, onClose }) {
+// The `~` panel: every tunable, live.
+export default function AdminPanel({ tune, onPatch, canEdit, open, onClose }) {
   if (!open) return null
   return (
     <div className="admin-overlay" onClick={onClose}>
@@ -69,7 +69,7 @@ export default function AdminPanel({ tune, onPatch, onReset, canEdit, open, onCl
             onClick={() => {
               const patch = {}
               for (const path of flatten(TUNE_DEFAULTS)) patch[path] = getByPath(TUNE_DEFAULTS, path)
-              onReset(patch)
+              onPatch(patch)
             }}
           >RESET ALL</button>
         </div>

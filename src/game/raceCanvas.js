@@ -10,8 +10,8 @@ export function decorFor(track) {
   return decorCache.get(track)
 }
 
-const ITEM_GLYPH = { boost: '🚀', oil: '🛢' }
-export const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL' }
+export const ITEM_GLYPH = { boost: '🚀', oil: '🛢' }
+export const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL SPILL' }
 
 export function renderRace(ctx, W, H, view, nowMs, track = TRACK) {
   const s = Math.min(W / WORLD_W, H / WORLD_H)
@@ -27,7 +27,6 @@ export function renderRace(ctx, W, H, view, nowMs, track = TRACK) {
   drawPit(ctx, track, nowMs)
   drawBoxes(ctx, view, track, nowMs)
   drawHazards(ctx, view, nowMs)
-  // depth: ground traffic, bridge decks, then bridge traffic on top
   drawVans(ctx, view, nowMs, false)
   const cars = [...(view?.cars ?? [])].sort((a, b) => (b.finished ? 1 : 0) - (a.finished ? 1 : 0))
   for (const car of cars) if ((car.level ?? 0) <= 0) drawCar(ctx, view, track, car, nowMs)
@@ -35,13 +34,12 @@ export function renderRace(ctx, W, H, view, nowMs, track = TRACK) {
   drawVans(ctx, view, nowMs, true)
   for (const car of cars) if ((car.level ?? 0) > 0) drawCar(ctx, view, track, car, nowMs)
   ctx.restore()
-  renderOverlays(ctx, W, H, view, nowMs)
+  renderOverlays(ctx, W, H, view)
 }
 
 function drawGround(ctx, decor) {
   ctx.fillStyle = '#3da64b'
   ctx.fillRect(0, 0, WORLD_W, WORLD_H)
-  // mowed stripes
   ctx.fillStyle = 'rgba(255,255,255,0.05)'
   for (let y = 0; y < WORLD_H; y += 80) ctx.fillRect(0, y, WORLD_W, 40)
   if (!decor) return
@@ -83,7 +81,6 @@ function drawTrack(ctx, track) {
   const pts = track.points
   const hw = track.halfWidth
   const w = hw * 2
-  // white base, red dashed curb, asphalt, center dashes
   trackPath(ctx, pts)
   ctx.lineWidth = w + 18
   ctx.strokeStyle = '#f5f5f5'
@@ -106,7 +103,6 @@ function drawTrack(ctx, track) {
   ctx.setLineDash([24, 30])
   ctx.stroke()
   ctx.setLineDash([])
-  // tunnel tubes: dark cutaway over the base ribbon + portal rings
   for (const run of levelRuns(track)) {
     if (run.level >= 0) continue
     runPath(ctx, track, run)
@@ -123,7 +119,6 @@ function drawTrack(ctx, track) {
       ctx.stroke()
     }
   }
-  // start/finish checker across the track at the start point
   ctx.save()
   ctx.translate(track.start.x, track.start.y)
   ctx.rotate(track.start.angle)
@@ -136,7 +131,6 @@ function drawTrack(ctx, track) {
   ctx.restore()
 }
 
-// Consecutive segment runs sharing a level (for decks and tubes).
 export function levelRuns(track) {
   const n = track.points.length
   const runs = []
@@ -164,13 +158,11 @@ export function runPath(ctx, track, run) {
   }
 }
 
-// Bridge decks render after ground traffic so cars underneath stay hidden.
 export function drawBridges(ctx, track) {
   const w = track.halfWidth * 2
   for (const run of levelRuns(track)) {
     if (run.level <= 0) continue
     const pts = track.points
-    // shadow
     ctx.save()
     ctx.translate(10, 14)
     runPath(ctx, track, run)
@@ -180,7 +172,6 @@ export function drawBridges(ctx, track) {
     ctx.setLineDash([])
     ctx.stroke()
     ctx.restore()
-    // deck + rails
     runPath(ctx, track, run)
     ctx.lineWidth = w + 10
     ctx.strokeStyle = '#4a4a56'
@@ -197,7 +188,6 @@ export function drawBridges(ctx, track) {
     ctx.setLineDash([18, 22])
     ctx.stroke()
     ctx.setLineDash([])
-    // support pillars every ~140px
     ctx.fillStyle = '#2a2a34'
     let acc = 0
     for (let i = run.from; i <= run.to; i += 1) {
@@ -221,9 +211,6 @@ export function trackPath(ctx, points) {
 }
 
 function drawPit(ctx, track, nowMs) {
-  // Oriented lane along the track. Anyone stopped anywhere in it gets
-  // serviced — no assigned boxes. Marching-ants border + entry chevrons
-  // so nobody can miss it.
   const pit = track.pit
   ctx.save()
   ctx.translate(pit.cx, pit.cy)
@@ -250,7 +237,6 @@ function drawPit(ctx, track, nowMs) {
   ctx.font = 'bold 22px monospace'
   ctx.textAlign = 'center'
   ctx.fillText('PIT — STOP ANYWHERE', 0, -Wd / 2 + 28)
-  // entry chevrons at the lane mouth (track direction = +x here)
   const slide = (nowMs / 300) % 1
   ctx.fillStyle = '#22ff66'
   for (let i = 0; i < 3; i += 1) {
@@ -300,7 +286,6 @@ function drawHazards(ctx, view, nowMs) {
     ctx.save()
     ctx.translate(hz.x, hz.y)
     if (hz.kind === 'oil') {
-      // big glossy slick with a shimmer sweep — impossible to miss
       const pulse = 0.75 + 0.25 * Math.sin(nowMs / 240)
       ctx.globalAlpha = pulse
       ctx.fillStyle = '#0a0a10'
@@ -350,7 +335,6 @@ function drawCar(ctx, view, track, car, nowMs) {
   const color = SEAT_COLORS[(car.colorIndex ?? car.seat) % SEAT_COLORS.length]
   ctx.save()
   ctx.translate(car.x, car.y)
-  // name + place
   ctx.font = `${isLocal ? 'bold 17px' : '14px'} monospace`
   ctx.textAlign = 'center'
   ctx.fillStyle = isLocal ? '#fff' : 'rgba(255,255,255,0.9)'
@@ -360,16 +344,16 @@ function drawCar(ctx, view, track, car, nowMs) {
   const labelText = car.finished ? `🏁 ${label}` : label
   ctx.strokeText(labelText, 0, -28)
   ctx.fillText(labelText, 0, -28)
-  // held item chip
   if (car.item) {
     ctx.font = '15px monospace'
     ctx.strokeText(ITEM_GLYPH[car.item] ?? '?', 24, -26)
     ctx.fillText(ITEM_GLYPH[car.item] ?? '?', 24, -26)
   }
   ctx.rotate(car.angle + (car.spinning ? Math.sin(nowMs / 90) * 0.9 : 0))
-  // shadow + body (slightly larger than the physics radius reads clearly)
   ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.fillRect(-15, -9, 31, 21)
+  ctx.fillStyle = '#1a1a22'
+  ctx.fillRect(-19, -11, 5, 22)
   ctx.fillStyle = color
   ctx.strokeStyle = isLocal ? '#fff' : 'rgba(0,0,0,0.6)'
   ctx.lineWidth = isLocal ? 3 : 2
@@ -377,12 +361,22 @@ function drawCar(ctx, view, track, car, nowMs) {
   ctx.roundRect(-15, -10, 31, 20, 5)
   ctx.fill()
   ctx.stroke()
-  // windshield + stripe
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.moveTo(16, -7); ctx.lineTo(24, 0); ctx.lineTo(16, 7)
+  ctx.closePath(); ctx.fill()
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)'
+  ctx.lineWidth = 1.5
+  ctx.stroke()
   ctx.fillStyle = 'rgba(10,14,24,0.9)'
-  ctx.fillRect(2, -7, 8, 14)
+  ctx.fillRect(0, -6, 8, 12)
+  ctx.fillStyle = '#fff9c4'
+  ctx.beginPath()
+  ctx.arc(13, -6, 2.4, 0, Math.PI * 2)
+  ctx.arc(13, 6, 2.4, 0, Math.PI * 2)
+  ctx.fill()
   ctx.fillStyle = 'rgba(255,255,255,0.35)'
   ctx.fillRect(-10, -2, 7, 4)
-  // boost flames + speed lines + callout
   if (car.boosting) {
     ctx.fillStyle = Math.floor(nowMs / 60) % 2 ? '#33ccff' : '#ff9f1c'
     ctx.beginPath()
@@ -407,7 +401,6 @@ function drawCar(ctx, view, track, car, nowMs) {
     ctx.fillText('🚀 BOOST!', 0, -48)
     ctx.restore()
   }
-  // bald tires: pulsing arrow to the pits for the local car
   if (isLocal && (car.wear ?? 0) >= 70 && track?.pit) {
     const pit = track.pit
     const ang = Math.atan2(pit.cy - car.y, pit.cx - car.x)
@@ -430,14 +423,12 @@ function drawCar(ctx, view, track, car, nowMs) {
     ctx.fillText((car.wear ?? 0) >= 100 ? '🔧 PIT NOW!' : '🔧 TIRES — PIT SOON', car.x, car.y - 52)
     ctx.restore()
   }
-  // nitro-style pit timing bar above a car being serviced
   if ((car.pit === 'crew' || car.pit === 'working') && isLocal) {
-    drawPitBar(ctx, car, nowMs)
+    drawPitBar(ctx, car)
   }
 }
 
-function drawPitBar(ctx, car, nowMs) {
-  void nowMs
+function drawPitBar(ctx, car) {
   const w = 130, h = 14
   const x = car.x - w / 2, y = car.y - 64
   ctx.save()
@@ -446,14 +437,12 @@ function drawPitBar(ctx, car, nowMs) {
   ctx.strokeStyle = '#fff'
   ctx.lineWidth = 2
   ctx.strokeRect(x - 2, y - 2, w + 4, h + 22)
-  // zones (match server perfectHalf/okHalf defaults; live values arrive via tune)
   const zone = car.pitZone ?? { perfectHalf: 0.06, okHalf: 0.18 }
   ctx.fillStyle = 'rgba(255,255,255,0.25)'
   ctx.fillRect(x, y, w, h)
   ctx.fillStyle = 'rgba(34,255,102,0.5)'
   const pw = w * zone.perfectHalf * 2
   ctx.fillRect(x + w / 2 - pw / 2, y, pw, h)
-  // needle (server-synced)
   const nx = x + w * (car.needle ?? 0.5)
   ctx.fillStyle = '#ffd23f'
   ctx.fillRect(nx - 2, y - 3, 4, h + 6)
@@ -464,11 +453,10 @@ function drawPitBar(ctx, car, nowMs) {
   ctx.restore()
 }
 
-function renderOverlays(ctx, W, H, view, nowMs) {
+function renderOverlays(ctx, W, H, view) {
   if (view?.phase === 'countdown' && view?.countdownEndsAt) {
     const remain = view.countdownEndsAt - Date.now()
     const label = remain > 2700 ? '3' : remain > 1800 ? '2' : remain > 900 ? '1' : 'GO!'
-    void nowMs
     ctx.save()
     ctx.textAlign = 'center'
     ctx.font = `900 ${Math.round(Math.min(W, H) * 0.12)}px monospace`

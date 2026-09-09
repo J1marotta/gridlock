@@ -1,17 +1,8 @@
-// Riverside Park — one big hand-built circuit, always fully visible.
-// World is 1600x900. Cars drive the loop counter-clockwise starting east
-// along the bottom straight: sweeper, S-curves, climb, top straight,
-// hairpin, drop, infield twist, home straight.
-//
-// Tracks are DATA (see makeTrack): the paint studio builds custom ones with
-// the same shape, so the sim, renderer and pits work on any loop.
-//
-// LEVELS: each segment has a level (0 ground, +1 bridge, -1 tunnel) so loops
-// can overlap. Cars track their segment; queries use a window around it so a
-// bridge never snaps to the road underneath.
-//
-// PITS are oriented lanes {cx, cy, angle, length, width} — service is
-// zone-based: stop anywhere in the lane and the crew runs out. No boxes.
+// Riverside Park loop (1600x900 world). Tracks are data (see makeTrack): the
+// paint studio builds custom ones with the same shape. Each segment has a
+// level (0 ground, +1 bridge, -1 tunnel); queries use a window around the
+// car so a bridge never snaps to the road underneath. Pits are oriented
+// lanes {cx, cy, angle, length, width} with zone-based service.
 export const WORLD_W = 1600
 export const WORLD_H = 900
 export const HALF_WIDTH = 46
@@ -37,7 +28,6 @@ function segLen(a, b) {
   return Math.hypot(b[0] - a[0], b[1] - a[1])
 }
 
-// Full track object from a raw loop. Options override the auto-derived bits.
 export function makeTrack(points, opts = {}) {
   const pts = points.map(p => [...p])
   const n = pts.length
@@ -62,7 +52,6 @@ export function buildTrack() {
   return makeTrack(STOCK_POINTS)
 }
 
-// Rebuild a track from studio JSON (or an older save). Returns { ok, track?, error? }.
 export function trackFromData(data) {
   if (!data || !Array.isArray(data.points) || data.points.length < 8) {
     return { ok: false, error: 'Need at least 8 loop points' }
@@ -74,7 +63,6 @@ export function trackFromData(data) {
   }
   const halfWidth = data.halfWidth ?? HALF_WIDTH
   if (!(halfWidth >= 24 && halfWidth <= 90)) return { ok: false, error: 'Width out of range' }
-  // pit: new oriented lane, or the legacy axis rect
   let pit
   if (data.pit && Number.isFinite(data.pit.cx)) {
     pit = {
@@ -94,8 +82,6 @@ export function trackFromData(data) {
 }
 
 export function gridSlot(track, i) {
-  // Slots ride the ribbon itself, staggered behind the start line, so every
-  // seat starts on asphalt no matter the loop shape.
   const row = Math.floor(i / 2)
   const side = i % 2 === 0 ? -1 : 1
   const back = 50 + row * 48
@@ -114,7 +100,6 @@ export function levelAt(track, seg) {
   return track.levels?.[((seg % track.points.length) + track.points.length) % track.points.length] ?? 0
 }
 
-// Oriented pit lane test: rotate the point into the lane frame.
 export function inPitZone(track, x, y) {
   const p = track.pit
   const dx = x - p.cx, dy = y - p.cy
@@ -128,34 +113,11 @@ export function pitCenter(track) {
   return { x: track.pit.cx, y: track.pit.cy }
 }
 
-// Closest point on the loop (level-agnostic: spawn/teleport use).
-export function closestOnTrack(track, x, y) {
-  const { points, cum } = track
-  const n = points.length
-  let best = { dist: Infinity, along: 0, seg: 0, px: x, py: y }
-  for (let i = 0; i < n; i += 1) {
-    const a = points[i]
-    const b = points[(i + 1) % n]
-    const abx = b[0] - a[0], aby = b[1] - a[1]
-    const len2 = abx * abx + aby * aby || 1
-    let t = ((x - a[0]) * abx + (y - a[1]) * aby) / len2
-    t = Math.min(1, Math.max(0, t))
-    const px = a[0] + abx * t, py = a[1] + aby * t
-    const d = Math.hypot(x - px, y - py)
-    if (d < best.dist) best = { dist: d, along: cum[i] + Math.sqrt(len2) * t, seg: i, px, py }
-  }
-  return best
-}
-
-// Level-aware closest: only segments near the car's current one count, so a
-// bridge never snaps to the road passing underneath. Falls back to a global
-// search (adopting whatever it finds) when truly lost — teleports, shoves.
-export function closestOnTrackLevel(track, x, y, segHint, window = 8) {
+function nearestOnSegments(track, x, y, indices) {
   const { points, cum } = track
   const n = points.length
   let best = null
-  for (let k = -window; k <= window; k += 1) {
-    const i = (((segHint + k) % n) + n) % n
+  for (const i of indices) {
     const a = points[i]
     const b = points[(i + 1) % n]
     const abx = b[0] - a[0], aby = b[1] - a[1]
@@ -166,6 +128,20 @@ export function closestOnTrackLevel(track, x, y, segHint, window = 8) {
     const d = Math.hypot(x - px, y - py)
     if (!best || d < best.dist) best = { dist: d, along: cum[i] + Math.sqrt(len2) * t, seg: i, px, py }
   }
+  return best
+}
+
+export function closestOnTrack(track, x, y) {
+  return nearestOnSegments(track, x, y, track.points.map((_, i) => i))
+}
+
+// Only segments near the car's current one count, so a bridge never snaps to
+// the road underneath. Falls back to a global search when truly lost.
+export function closestOnTrackLevel(track, x, y, segHint, window = 8) {
+  const n = track.points.length
+  const indices = []
+  for (let k = -window; k <= window; k += 1) indices.push((((segHint + k) % n) + n) % n)
+  const best = nearestOnSegments(track, x, y, indices)
   if (!best || best.dist > 160) {
     return closestOnTrack(track, x, y)
   }
@@ -178,7 +154,6 @@ export function gateAt(track, along) {
   return { gate, gateStart: (gate / track.gateCount) * track.total }
 }
 
-// Point ahead on the centerline (for AI steering + minimap dots).
 export function pointAhead(track, along, aheadDist) {
   const a = ((along + aheadDist) % track.total + track.total) % track.total
   const { points, cum } = track
@@ -193,7 +168,6 @@ export function pointAhead(track, along, aheadDist) {
   return { x: points[0][0], y: points[0][1] }
 }
 
-// Seeded decor that stays clear of the racing surface.
 export function mulberry(seed) {
   let s = seed >>> 0
   return () => {

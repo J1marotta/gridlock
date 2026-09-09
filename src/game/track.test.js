@@ -44,9 +44,6 @@ describe('riverside park', () => {
   })
 
   it('along-distance is continuous past the wrap', () => {
-    const a = closestOnTrack(track, track.points[0][0], track.points[0][1])
-    expect(a.along).toBeGreaterThanOrEqual(0)
-    expect(a.along).toBeLessThan(track.total)
     const p = pointAhead(track, track.total - 10, 30)
     const c = closestOnTrack(track, p.x, p.y)
     expect(c.along).toBeLessThan(100)

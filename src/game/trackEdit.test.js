@@ -7,13 +7,6 @@ import { makeTrack } from './track.js'
 // A rounded-rectangle loop, clockwise.
 function roundedRect(cx, cy, w, h, r, n = 8) {
   const pts = []
-  const corners = [
-    [cx + w / 2 - r, cy - h / 2, 0],
-    [cx + w / 2, cy - h / 2 + r, 90],
-    [cx + w / 2, cy + h / 2 - r, 180],
-    [cx - w / 2 + r, cy + h / 2, 270],
-  ]
-  void corners
   const arcs = [
     [cx + w / 2 - r, cy - h / 2 + r, -90, 0],
     [cx + w / 2 - r, cy + h / 2 - r, 0, 90],
@@ -75,10 +68,10 @@ describe('studio geometry', () => {
     const res = finalizeTrack(roundedRect(800, 450, 900, 500, 120), { name: 'Test Oval' })
     expect(res.ok).toBe(true)
     expect(res.data.points.length).toBeGreaterThan(30)
-    expect(res.data.pit.cx).toBeDefined()
+    expect(Number.isFinite(res.data.pit.cx)).toBe(true)
     expect(res.data.pit.length).toBeGreaterThan(200)
     expect(res.data.boxes).toHaveLength(6)
-    expect(res.data.start.angle).toBeDefined()
+    expect(Number.isFinite(res.data.start.angle)).toBe(true)
     const track = makeTrack(res.data.points, res.data)
     expect(track.total).toBeGreaterThan(1500)
     expect(track.pit.length).toBeGreaterThan(200)
@@ -89,6 +82,10 @@ describe('studio geometry', () => {
     const { pit } = autoPit(pts, 46)
     expect(pit.length).toBeGreaterThan(200)
     expect(pit.width).toBeGreaterThan(60)
+    expect(pit.cx).toBeGreaterThanOrEqual(40)
+    expect(pit.cx).toBeLessThanOrEqual(1560)
+    expect(pit.cy).toBeGreaterThanOrEqual(40)
+    expect(pit.cy).toBeLessThanOrEqual(860)
   })
 
   it('placement tools snap pit and start to the loop', () => {

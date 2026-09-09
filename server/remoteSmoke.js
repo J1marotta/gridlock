@@ -1,5 +1,4 @@
 // Remote smoke test against the deployed Fly.io room.
-// Usage: COLYSEUS_URL=wss://gridlock-racer.fly.dev npm run smoke:fly
 import { Client } from '@colyseus/sdk'
 import { CLIENT_MESSAGE_TYPES, PROTOCOL_VERSION } from '../src/multiplayer/protocol.js'
 
@@ -35,10 +34,6 @@ try {
   rooms.push(host)
   const guest = await new Client(endpoint).joinById(roomCode, { playerName: 'Smoke Guest' })
   rooms.push(guest)
-  host.onMessage('event', () => {})
-  guest.onMessage('event', () => {})
-  host.onMessage('private-state', () => {})
-  guest.onMessage('private-state', () => {})
   await waitFor(() => host.state.players?.size === 2 && guest.state.players?.size === 2, 20000, 'roster sync')
 
   let hostSeat = null

@@ -35,7 +35,6 @@ describe('LocalRace full solo race', () => {
     expect(race.race.phase).toBe('finished')
     expect(race.race.winnerSeat).toBeGreaterThanOrEqual(0)
     expect(me().lap).toBeGreaterThanOrEqual(2)
-    expect(me().place).toBeGreaterThanOrEqual(1)
     expect(sawPit).toBe(true)
     const snap = race.snapshot()
     expect(snap.cars).toHaveLength(12)

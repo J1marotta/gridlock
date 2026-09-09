@@ -18,4 +18,10 @@ describe('gridlock protocol', () => {
     expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.TUNE, { patch: 42 })).ok).toBe(false)
     expect(checkMessageOrder({ roundId: 1, sequence: 2 }, { roundId: 1, lastSequence: 2 }).ok).toBe(false)
   })
+
+  it('settings requires a known privacy value', () => {
+    expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.SETTINGS, { privacy: 'public' })).ok).toBe(true)
+    expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.SETTINGS, {})).ok).toBe(false)
+    expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.SETTINGS, { privacy: 'galaxy' })).ok).toBe(false)
+  })
 })
