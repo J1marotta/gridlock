@@ -35,6 +35,7 @@ describe('GridRoom race flow', () => {
     expect(room.state.phase).toBe('racing')
     expect(cmd(room, host, 'input', { steer: 0.2, throttle: 1 }).ok).toBe(true)
     expect(cmd(room, host, 'use-item').ok).toBe(false)
+    expect(cmd(room, host, 'vote-preset', { presetId: 'drift' }).ok).toBe(false)
 
     // drive a little: someone should move
     for (let t = 0; t < 2000; t += 50) room.advanceSimulation(50, Date.now() + t)
@@ -50,11 +51,17 @@ describe('GridRoom race flow', () => {
     room.advanceSimulation(50, now)
     expect(room.state.phase).toBe('finished')
     expect(room.state.winnerSeat).toBeGreaterThanOrEqual(0)
+    expect(cmd(room, guest, 'vote-preset', { presetId: 'drift' }).ok).toBe(true)
+    expect(cmd(room, host, 'vote-preset', { presetId: 'drift' }).ok).toBe(true)
+    expect(JSON.parse(room.state.presetVotesJson)).toEqual({ [room.playerIdBySession.get('s-guest')]: 'drift', [room.playerIdBySession.get('s-host')]: 'drift' })
 
     expect(cmd(room, guest, 'next-race', {}, room.state.raceNo).ok).toBe(false)
     expect(cmd(room, host, 'next-race', {}, room.state.raceNo).ok).toBe(true)
     expect(room.state.phase).toBe('lobby')
     expect(room.state.raceNo).toBe(2)
+    expect(room.state.activePreset).toBe('drift')
+    expect(room.tune.car.grip).toBe(6.5)
+    expect(room.state.presetVotesJson).toBe('{}')
   })
 
   it('host picks premade or studio tracks in the lobby', async () => {

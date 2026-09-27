@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import { ColyseusTransport, getColyseusEndpoint } from './multiplayer/colyseusTransport.js'
 import { normalizeRoomCode, randomRoomCode } from './multiplayer/protocol.js'
 import { SEAT_COLORS } from '../server/sim.js'
-import { applyPatch, cloneTune } from './game/tune.js'
+import { applyPatch, cloneTune, RACE_PRESETS } from './game/tune.js'
 import { renderRace, ITEM_GLYPH, ITEM_LABEL } from './game/raceCanvas.js'
 import { GridAudio } from './game/audio.js'
 import { LocalRace } from './game/localRace.js'
@@ -21,6 +21,8 @@ function useTransport() {
 function adaptNetView(snapshot, privateState, tune) {
   if (!snapshot) return null
   const map = m => (m instanceof Map ? [...m.values()] : Object.values(m ?? {}))
+  let presetVotes = {}
+  try { presetVotes = JSON.parse(snapshot.presetVotesJson || '{}') } catch { /* ignore malformed vote state */ }
   return {
     phase: snapshot.phase,
     roomCode: snapshot.roomCode,
@@ -30,6 +32,8 @@ function adaptNetView(snapshot, privateState, tune) {
     countdownEndsAt: snapshot.countdownEndsAt,
     winnerName: snapshot.winnerName,
     winnerSeat: snapshot.winnerSeat,
+    activePreset: snapshot.activePreset || 'balanced',
+    presetVotes,
     localSeat: privateState?.seat ?? -1,
     pitZone: { perfectHalf: tune.pit.perfectHalf, okHalf: tune.pit.okHalf },
     players: map(snapshot.players),
@@ -435,6 +439,7 @@ export default function GridApp() {
           <div className="grid-card">
             <h2>LOBBY — {view.roomCode}</h2>
             <p className="dim">TRACK: <b>{view.trackName || 'Speedway'}</b></p>
+            <p className="dim">NEXT RACE FEEL: <b>{RACE_PRESETS.find(p => p.id === view.activePreset)?.name ?? 'Grip Hero'}</b></p>
             <ul className="nitro-players">
               {view.players.map(p => (
                 <li key={p.id}>
@@ -489,6 +494,12 @@ export default function GridApp() {
             {screen === 'finished' && (
               <div className="grid-card" ref={resultRef}>
                 <div className="winner-banner">🏁 {view.winnerName} WINS 🏁</div>
+                {mode === 'net' && <PresetVote
+                  activePreset={view.activePreset}
+                  votes={view.presetVotes}
+                  playerId={privateState?.playerId}
+                  onVote={presetId => { try { transport.votePreset(presetId) } catch { /* noop */ } }}
+                />}
                 <table className="standings">
                   <thead><tr><th>POS</th><th>RACER</th><th>BEST LAP</th><th>WINS</th></tr></thead>
                   <tbody>
@@ -509,7 +520,7 @@ export default function GridApp() {
                   {mode === 'local' ? (
                     <button className="nitro-btn go" onClick={soloRematch}>REMATCH →</button>
                   ) : isHost() ? (
-                    <button className="nitro-btn go" onClick={() => transport.nextRace()}>NEXT RACE →</button>
+                    <button className="nitro-btn go" onClick={() => transport.nextRace()}>APPLY VOTE & NEXT RACE →</button>
                   ) : <span className="dim">Waiting for host…</span>}
                 </div>
               </div>
@@ -553,6 +564,33 @@ function TrackSelect({ value, onChange, slots }) {
       {slots.map(s => s && <option key={s.value} value={s.value}>🎨 {s.label}</option>)}
     </select>
   )
+}
+
+function PresetVote({ activePreset, votes = {}, playerId, onVote }) {
+  const currentVote = playerId ? votes[playerId] : ''
+  const counts = Object.values(votes).reduce((all, id) => ({ ...all, [id]: (all[id] ?? 0) + 1 }), {})
+  return <section className="preset-votes" aria-labelledby="preset-vote-title">
+    <div className="preset-vote-head">
+      <div>
+        <h3 id="preset-vote-title">Vote the next race feel</h3>
+        <p className="dim small">Current feel: {RACE_PRESETS.find(p => p.id === activePreset)?.name ?? 'Grip Hero'}. Host applies the vote when starting the next round.</p>
+      </div>
+      <span className="vote-total">{Object.keys(votes).length} vote{Object.keys(votes).length === 1 ? '' : 's'}</span>
+    </div>
+    <div className="preset-options" role="group" aria-label="Choose next round handling preset">
+      {RACE_PRESETS.map(preset => <button
+        key={preset.id}
+        type="button"
+        className={`preset-choice ${currentVote === preset.id ? 'selected' : ''}`}
+        aria-pressed={currentVote === preset.id}
+        onClick={() => onVote(preset.id)}
+      >
+        <span className="preset-name">{preset.icon} {preset.name}</span>
+        <span className="preset-feel">{preset.feel}</span>
+        <span className="preset-count" aria-label={`${counts[preset.id] ?? 0} votes`}>{counts[preset.id] ?? 0} votes</span>
+      </button>)}
+    </div>
+  </section>
 }
 
 function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, onShare, inRoom }) {

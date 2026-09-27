@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import { TUNE_DEFAULTS, TUNE_META, applyPatch, cloneTune, getByPath, setByPath } from './tune.js'
+import { TUNE_DEFAULTS, TUNE_META, RACE_PRESETS, applyPatch, applyRacePreset, cloneTune, getByPath, setByPath } from './tune.js'
 
 describe('tune system', () => {
+  it('offers three distinct, valid handling presets', () => {
+    expect(RACE_PRESETS.map(p => p.id)).toEqual(['balanced', 'drift', 'turbo'])
+    const t = cloneTune()
+    expect(applyRacePreset(t, 'drift')).toBe(true)
+    expect(t.car.grip).toBe(6.5)
+    expect(t.car.steerRate).toBeGreaterThan(TUNE_DEFAULTS.car.steerRate)
+    expect(applyRacePreset(t, 'unknown')).toBe(false)
+  })
+
   it('defaults are sane', () => {
     expect(TUNE_DEFAULTS.race.laps).toBe(3)
     expect(TUNE_DEFAULTS.items.boost).toBe(true)

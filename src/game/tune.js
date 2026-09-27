@@ -1,8 +1,8 @@
 // Live-tunable variables, read by the sim every tick.
 export const TUNE_DEFAULTS = {
   race: { laps: 3, countdownMs: 3600, winnerGraceMs: 25000, timeLimitMs: 300000 },
-  car: { topMul: 1, accel: 175, brakePow: 280, reverseTop: 70, steerRate: 2.7, grip: 7.5, offTopMul: 0.55 },
-  tires: { wearRate: 1.15, offWearMul: 2.2, driftWearMul: 1.8, gripLoss: 0.45, topLoss: 0.35, baldCap: 0.5 },
+  car: { topMul: 1, accel: 205, brakePow: 340, reverseTop: 70, steerRate: 3, grip: 9.4, offTopMul: 0.58 },
+  tires: { wearRate: 0.82, offWearMul: 2, driftWearMul: 1.55, gripLoss: 0.34, topLoss: 0.26, baldCap: 0.5 },
   items: {
     boost: true, oil: true,
     boxRespawnMs: 6000, boostTopMul: 1.55, boostMs: 1600,
@@ -10,6 +10,32 @@ export const TUNE_DEFAULTS = {
   },
   traffic: { count: 5, speed: 100 },
   pit: { speedLimit: 150, boxHoldMs: 400, crewBaseMs: 1000, perfectMs: 600, okMs: 1600, slowMs: 3000, perfectHalf: 0.06, okHalf: 0.18, needleSpeed: 1.7 },
+}
+
+export const RACE_PRESETS = [
+  {
+    id: 'balanced', name: 'Grip Hero', icon: '🛞', feel: 'Predictable, quick corner exits',
+    car: { topMul: 1, accel: 205, brakePow: 340, steerRate: 3, grip: 9.4 },
+    tires: { wearRate: 0.82, driftWearMul: 1.55, gripLoss: 0.34, topLoss: 0.26 },
+  },
+  {
+    id: 'drift', name: 'Sideways', icon: '💨', feel: 'Loose turns, bigger slides',
+    car: { topMul: 1.03, accel: 205, brakePow: 300, steerRate: 3.65, grip: 6.5 },
+    tires: { wearRate: 0.98, driftWearMul: 1.25, gripLoss: 0.38, topLoss: 0.28 },
+  },
+  {
+    id: 'turbo', name: 'Redline', icon: '🚀', feel: 'Big speed, twitchier handling',
+    car: { topMul: 1.14, accel: 235, brakePow: 300, steerRate: 3.25, grip: 7.2 },
+    tires: { wearRate: 1.05, driftWearMul: 1.7, gripLoss: 0.42, topLoss: 0.32 },
+  },
+]
+
+export function applyRacePreset(tune, presetId) {
+  const preset = RACE_PRESETS.find(item => item.id === presetId)
+  if (!preset) return false
+  Object.assign(tune.car, preset.car)
+  Object.assign(tune.tires, preset.tires)
+  return true
 }
 
 export const TUNE_META = {

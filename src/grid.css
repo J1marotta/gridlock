@@ -153,3 +153,23 @@
 .share-card img { display: block; width: 190px; height: 190px; margin: 14px auto; border-radius: 8px; }
 .share-card .share-url { width: 100%; margin: 0 0 10px; }
 .share-close { position: absolute; top: 10px; right: 10px; }
+.preset-votes { margin: 12px 0 8px; padding: 12px; border: 2px solid #345343; border-radius: 12px; background: #09100d; }
+.preset-vote-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.preset-vote-head h3 { color: #44ff66; margin: 0 0 3px; font-size: 16px; }
+.preset-vote-head p { margin: 0; }
+.vote-total, .preset-count { color: #cfe9ff; font-size: 12px; font-weight: 800; white-space: nowrap; }
+.preset-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 9px; }
+.preset-choice { min-height: 92px; display: flex; flex-direction: column; align-items: flex-start; justify-content: space-between; gap: 7px; padding: 10px; border: 2px solid #6c7788; border-radius: 10px; color: #fff; background: #171b24; text-align: left; cursor: pointer; }
+.preset-choice:hover, .preset-choice:focus-visible { border-color: #fff; outline: 2px solid #101018; outline-offset: 1px; }
+.preset-choice.selected { border-color: #22ff66; background: #10331d; box-shadow: inset 0 0 0 1px #22ff66; }
+.preset-name { font-weight: 900; font-size: 14px; }
+.preset-feel { color: #e8f5ff; font-size: 12px; line-height: 1.25; }
+.preset-count { align-self: flex-end; }
+
+@media (max-width: 560px) {
+  .preset-votes { padding: 8px; }
+  .preset-options { grid-template-columns: 1fr; }
+  .preset-choice { min-height: 66px; display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px 8px; }
+  .preset-feel { grid-column: 1; }
+  .preset-count { grid-column: 2; grid-row: 1 / span 2; }
+}

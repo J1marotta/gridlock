@@ -7,7 +7,7 @@ import {
   createServerEnvelope,
   validateClientMessage,
 } from '../src/multiplayer/protocol.js'
-import { applyPatch, cloneTune } from '../src/game/tune.js'
+import { applyPatch, applyRacePreset, cloneTune, RACE_PRESETS } from '../src/game/tune.js'
 import { getTrack, getTrackData } from '../src/game/tracks.js'
 import { trackFromData } from '../src/game/track.js'
 import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from './sim.js'
@@ -42,6 +42,7 @@ export class GridRoom extends Room {
   tune = cloneTune()
   race = null
   pendingTrackData = null
+  presetVotes = new Map()
   messages = { command: (client, message) => this.handleCommand(client, message) }
 
   onCreate(options = {}) {
@@ -63,6 +64,8 @@ export class GridRoom extends Room {
       tuneJson: JSON.stringify(this.tune),
       trackJson: JSON.stringify(getTrackData('speedway').data),
       trackName: 'Speedway',
+      activePreset: 'balanced',
+      presetVotesJson: '{}',
     })
     this.setSimulationInterval?.(deltaMs => this.advanceSimulation(deltaMs), SERVER_TICK_MS)
   }
@@ -119,6 +122,7 @@ export class GridRoom extends Room {
     else if (msg.type === CLIENT_MESSAGE_TYPES.INPUT) result = this.drive(player, P)
     else if (msg.type === CLIENT_MESSAGE_TYPES.USE_ITEM) result = this.useItem(player)
     else if (msg.type === CLIENT_MESSAGE_TYPES.PIT_PRESS) result = this.pitPress(player)
+    else if (msg.type === CLIENT_MESSAGE_TYPES.VOTE_PRESET) result = this.votePreset(player, P.presetId)
     else if (msg.type === CLIENT_MESSAGE_TYPES.TUNE) result = this.tuneCmd(player, P.patch)
     else if (msg.type === CLIENT_MESSAGE_TYPES.SET_TRACK) result = this.setTrack(player, P.track)
     else if (msg.type === CLIENT_MESSAGE_TYPES.NEXT_RACE) result = this.nextRace(player)
@@ -261,9 +265,27 @@ export class GridRoom extends Room {
   nextRace(player) {
     if (this.state.phase !== 'finished') return { ok: false, error: 'wrong-phase', message: 'Race not over' }
     if (!this.isHost(player)) return { ok: false, error: 'host-only', message: 'Host only' }
+    const counts = Object.fromEntries(RACE_PRESETS.map(p => [p.id, 0]))
+    for (const presetId of this.presetVotes.values()) counts[presetId] = (counts[presetId] ?? 0) + 1
+    const high = Math.max(...Object.values(counts))
+    const tied = RACE_PRESETS.filter(p => counts[p.id] === high)
+    const winner = tied.find(p => p.id === this.state.activePreset) ?? tied.find(p => p.id === 'balanced') ?? tied[0]
+    applyRacePreset(this.tune, winner.id)
+    this.state.activePreset = winner.id
+    this.state.tuneJson = JSON.stringify(this.tune)
+    this.presetVotes.clear()
+    this.state.presetVotesJson = '{}'
     this.state.raceNo += 1
     this.state.phase = 'lobby'
     for (const p of this.state.players.values()) if (p.connected) p.ready = false
+    return { ok: true }
+  }
+
+  votePreset(player, presetId) {
+    if (this.state.phase !== 'finished') return { ok: false, error: 'wrong-phase', message: 'Vote after the race finishes' }
+    if (!RACE_PRESETS.some(p => p.id === presetId)) return { ok: false, error: 'invalid-preset', message: 'Choose one of the listed race feels' }
+    this.presetVotes.set(player.id, presetId)
+    this.state.presetVotesJson = JSON.stringify(Object.fromEntries(this.presetVotes))
     return { ok: true }
   }
 

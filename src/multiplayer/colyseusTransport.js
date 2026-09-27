@@ -118,6 +118,7 @@ export class ColyseusTransport {
   drive(steer, throttle) { this.command(CLIENT_MESSAGE_TYPES.INPUT, { steer, throttle }) }
   useItem() { this.command(CLIENT_MESSAGE_TYPES.USE_ITEM) }
   pitPress() { this.command(CLIENT_MESSAGE_TYPES.PIT_PRESS) }
+  votePreset(presetId) { this.command(CLIENT_MESSAGE_TYPES.VOTE_PRESET, { presetId }) }
   tune(patch) { this.command(CLIENT_MESSAGE_TYPES.TUNE, { patch }) }
   setTrack(track) { this.command(CLIENT_MESSAGE_TYPES.SET_TRACK, { track }) }
   nextRace() { this.command(CLIENT_MESSAGE_TYPES.NEXT_RACE) }
