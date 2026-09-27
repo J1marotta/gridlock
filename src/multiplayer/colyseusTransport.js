@@ -3,6 +3,7 @@ import { CLIENT_MESSAGE_TYPES, PROTOCOL_VERSION, SERVER_MESSAGE_TYPES } from './
 
 export const DEFAULT_COLYSEUS_ENDPOINT = 'ws://127.0.0.1:2567'
 export const PRODUCTION_COLYSEUS_ENDPOINT = 'wss://gridlock-racer.fly.dev'
+const RESUME_KEY = 'gridlock-room-resume'
 
 export function getColyseusEndpoint() {
   return import.meta.env.VITE_COLYSEUS_URL || (import.meta.env.PROD
@@ -44,10 +45,29 @@ export class ColyseusTransport {
     return this.attach(room)
   }
 
+  async resume() {
+    let saved
+    try { saved = JSON.parse(localStorage.getItem(RESUME_KEY) || 'null') } catch { /* stale data */ }
+    if (!saved?.token) return null
+    try {
+      const room = await this.client.reconnect(saved.token, 'grid-room')
+      return this.attach(room)
+    } catch {
+      localStorage.removeItem(RESUME_KEY)
+      return null
+    }
+  }
+
   attach(room) {
     this.room = room
     this.roomId = room.roomId
     this.closedIntentionally = false
+    const saveResume = () => {
+      if (room.reconnectionToken) {
+        localStorage.setItem(RESUME_KEY, JSON.stringify({ token: room.reconnectionToken, roomCode: room.id }))
+      }
+    }
+    saveResume()
     room.onStateChange(state => {
       const snapshot = state?.toJSON ? state.toJSON() : state
       const rawPlayers = snapshot?.players instanceof Map
@@ -56,6 +76,7 @@ export class ColyseusTransport {
       const local = rawPlayers.find(p => p.connectionId === room.sessionId)
       if (local) this.privateState = { ...this.privateState, playerId: local.id }
       this.roundId = snapshot?.raceNo ?? this.roundId
+      saveResume()
       this.latestState = snapshot
       this.emit('snapshot', snapshot)
     })
@@ -69,7 +90,10 @@ export class ColyseusTransport {
       this.closedIntentionally = true
       this.emit('closed', envelope.payload)
     })
-    room.onLeave(() => this.emit('closed', { code: 'left' }))
+    room.onLeave(code => {
+      if (this.closedIntentionally) return
+      this.emit('closed', { code, message: 'Connection lost. Reopen the room link to reconnect.' })
+    })
     this.emit('status', 'connected')
     return room
   }
@@ -100,6 +124,7 @@ export class ColyseusTransport {
 
   async leave() {
     this.closedIntentionally = true
+    localStorage.removeItem(RESUME_KEY)
     if (this.room) {
       try { this.command(CLIENT_MESSAGE_TYPES.LEAVE) } catch { /* noop */ }
       await this.room.leave()

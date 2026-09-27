@@ -143,3 +143,10 @@
   .touch-controls button { pointer-events: auto; min-height: 54px; max-height: 58px; }
   .grid-shell:has(.race-screen) .topstrip { opacity: .8; }
 }
+
+.share-overlay { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; padding: 16px; background: rgba(0,0,0,.78); }
+.share-card { position: relative; width: min(430px, 100%); padding: 24px; border: 2px solid #33ccff; border-radius: 18px; background: #101018; text-align: center; box-shadow: 0 12px 60px #000; }
+.share-card h2 { margin: 4px 0 8px; color: #44ff66; }
+.share-card img { display: block; width: 190px; height: 190px; margin: 14px auto; border-radius: 8px; }
+.share-card .share-url { width: 100%; margin: 0 0 10px; }
+.share-close { position: absolute; top: 10px; right: 10px; }

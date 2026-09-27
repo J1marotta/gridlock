@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import QRCode from 'qrcode'
 import { ColyseusTransport, getColyseusEndpoint } from './multiplayer/colyseusTransport.js'
 import { normalizeRoomCode, randomRoomCode } from './multiplayer/protocol.js'
 import { SEAT_COLORS } from '../server/sim.js'
@@ -49,7 +50,9 @@ export default function GridApp() {
   const [screen, setScreen] = useState('menu')
   const [mode, setMode] = useState('net')
   const [name, setName] = useState(() => localStorage.getItem('gridlock-name') || 'Racer1')
-  const [code, setCode] = useState('')
+  const [code, setCode] = useState(() => normalizeRoomCode(new URLSearchParams(window.location.search).get('room') || ''))
+  const [shareOpen, setShareOpen] = useState(false)
+  const [shareQr, setShareQr] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [closedMsg, setClosedMsg] = useState('')
@@ -137,6 +140,40 @@ export default function GridApp() {
     })
     return () => { off1(); off2(); off3(); off4() }
   }, [transport])
+
+  useEffect(() => {
+    let active = true
+    transport.resume().then(room => {
+      if (active && room) setMode('net')
+    })
+    return () => { active = false }
+  }, [transport])
+
+  const inviteUrl = useMemo(() => {
+    if (!view?.roomCode) return ''
+    const url = new URL(window.location.href)
+    url.search = ''
+    url.hash = ''
+    url.searchParams.set('room', view.roomCode)
+    return url.toString()
+  }, [view?.roomCode])
+
+  useEffect(() => {
+    if (!shareOpen || !inviteUrl) return
+    let active = true
+    QRCode.toDataURL(inviteUrl, { margin: 1, width: 220, color: { dark: '#101018', light: '#ffffff' } })
+      .then(data => { if (active) setShareQr(data) })
+      .catch(() => { if (active) setShareQr('') })
+    return () => { active = false }
+  }, [shareOpen, inviteUrl])
+
+  function updateRoomLink(roomCode) {
+    setCode(roomCode)
+    const url = new URL(window.location.href)
+    url.search = ''
+    if (roomCode) url.searchParams.set('room', roomCode)
+    window.history.replaceState({}, '', url)
+  }
 
   // countdown beeps + finish fanfare
   useEffect(() => {
@@ -250,6 +287,7 @@ export default function GridApp() {
       localStorage.setItem('gridlock-name', name)
       const roomCode = normalizeRoomCode(code) || randomRoomCode()
       await transport.create({ roomCode, playerName: name.trim() || 'Racer', privacy: 'public' })
+      updateRoomLink(roomCode)
       setMode('net')
       setScreen('lobby')
     } catch (err) { setError(err?.message || 'Create failed') }
@@ -261,7 +299,9 @@ export default function GridApp() {
     try {
       audioRef.current.ensure()
       localStorage.setItem('gridlock-name', name)
-      await transport.join({ roomCode: normalizeRoomCode(code), playerName: name.trim() || 'Racer' })
+      const roomCode = normalizeRoomCode(code)
+      await transport.join({ roomCode, playerName: name.trim() || 'Racer' })
+      updateRoomLink(roomCode)
       setMode('net')
       setScreen('lobby')
     } catch (err) { setError(err?.message || 'Join failed — check code') }
@@ -324,7 +364,7 @@ export default function GridApp() {
       try { await transport.leave() } catch { /* noop */ }
     }
     keysRef.current = { up: false, down: false, left: false, right: false }
-    setSnapshot(null); setPrivateState(null); setScreen('menu')
+    setSnapshot(null); setPrivateState(null); setScreen('menu'); updateRoomLink('')
   }
 
   function onPatch(patch) {
@@ -345,7 +385,7 @@ export default function GridApp() {
       <TopStrip
         view={view} chips={chips} mySeat={mySeat} muted={muted}
         onMute={() => { const m = !muted; setMuted(m); audioRef.current.ensure(); audioRef.current.setMuted(m) }}
-        onLeave={doLeave} onAdmin={() => setAdminOpen(o => !o)} inRoom={screen !== 'menu'}
+        onLeave={doLeave} onAdmin={() => setAdminOpen(o => !o)} onShare={() => setShareOpen(true)} inRoom={screen !== 'menu'}
       />
       <div className="grid-layout">
         {error && <div className="grid-card grid-err">⚠ {error}</div>}
@@ -484,6 +524,19 @@ export default function GridApp() {
         tune={tune} open={adminOpen} canEdit={canTune}
         onClose={() => setAdminOpen(false)} onPatch={onPatch}
       />
+      {shareOpen && <div className="share-overlay" onClick={() => setShareOpen(false)}>
+        <section className="share-card" role="dialog" aria-modal="true" aria-label="Share race invite" onClick={e => e.stopPropagation()}>
+          <button className="share-close nitro-btn small" onClick={() => setShareOpen(false)}>CLOSE</button>
+          <h2>INVITE RACERS</h2>
+          <p className="dim">Scan the code or share the link. It opens with room {view?.roomCode} filled in.</p>
+          {shareQr && <img src={shareQr} alt="QR code for this race invite" />}
+          <input className="g-input share-url" readOnly value={inviteUrl} onFocus={e => e.target.select()} />
+          <div className="nitro-row">
+            <button className="nitro-btn primary" onClick={() => navigator.clipboard?.writeText(inviteUrl)}>COPY LINK</button>
+            <button className="nitro-btn" onClick={() => navigator.share?.({ title: 'Join my Gridlock race', text: `Race code ${view?.roomCode}`, url: inviteUrl })}>SHARE…</button>
+          </div>
+        </section>
+      </div>}
     </div>
   )
 }
@@ -497,7 +550,7 @@ function TrackSelect({ value, onChange, slots }) {
   )
 }
 
-function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, inRoom }) {
+function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, onShare, inRoom }) {
   return (
     <div className="topstrip">
       <div className="logo">GRIDLOCK</div>
@@ -516,6 +569,7 @@ function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, inRoom
       </div>
       <div className="nitro-row">
         {view && <span className="roompill">ROOM {view.roomCode}{view.raceNo > 1 ? ` · R${view.raceNo}` : ''}</span>}
+        {view && <button className="nitro-btn small" onClick={onShare} title="Share room invite">↗ INVITE</button>}
         {inRoom && <button className="nitro-btn small" onClick={onAdmin} title="Live tune (~)">🔧</button>}
         <button className="nitro-btn small" onClick={onMute}>{muted ? '🔇' : '🔊'}</button>
         {inRoom && <button className="nitro-btn small" onClick={onLeave}>LEAVE</button>}
