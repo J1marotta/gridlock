@@ -13,12 +13,12 @@ React shell + canvas track).
   The Esses — plus anything painted in the Track Studio. Solo and the host
   pick from premade + studio saves; the host can upload a studio loop online.
 - **12 cars**, bots fill the grid. 3 laps (tunable), checkpoints validate laps.
-- Controls: **↑ gas, ↓ brake, ← → steer, Space item / pit timing**.
+- Controls: keyboard **↑ gas, ↓ brake, ← → steer, Space item, P pit**. Touch screens use auto-gas, thumb steering, item and pit buttons.
 - **Items** (hold one, boxes respawn, odds favor the back): rocket **boost** and
   **oil spills**. Each toggleable live.
 - **Traffic**: slow civilian vans on the racing line. Tag one, lose speed.
-- **Tires wear** (driving, drifting, grass). Bald = half top speed. Box for the
-  crew: stop in your slot, hit **Space** with the needle centered for a fast stop.
+- **Tires wear** (driving, drifting, grass). Bald = half top speed. Enter the
+  marked pit lane and tap **P** (or the touch PIT button) to stop for fresh tyres.
 - **Live tune**: press **~** anywhere for the admin panel — every variable
   adjustable mid-race. Solo: free. Multiplayer: host only.
 

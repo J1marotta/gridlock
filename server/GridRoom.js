@@ -199,7 +199,7 @@ export class GridRoom extends Room {
   pitPress(player) {
     const car = this.carOf(player.id)
     if (!car || this.state.phase !== 'racing') return { ok: false, error: 'wrong-phase', message: 'Not racing' }
-    return pressPit(this.race, car) ? { ok: true } : { ok: false, error: 'no-crew', message: 'Crew is not ready' }
+    return pressPit(this.race, car) ? { ok: true } : { ok: false, error: 'pit-unavailable', message: 'Enter the pit lane with worn tyres to stop for service' }
   }
 
   startRace(player) {

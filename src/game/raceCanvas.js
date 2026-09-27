@@ -237,7 +237,7 @@ function drawPit(ctx, track, nowMs) {
   ctx.fillStyle = '#9be9ff'
   ctx.font = 'bold 22px monospace'
   ctx.textAlign = 'center'
-  ctx.fillText('PIT — STOP ANYWHERE', 0, -Wd / 2 + 28)
+  ctx.fillText('PIT LANE — STOP & SERVICE', 0, -Wd / 2 + 28)
   const slide = (nowMs / 300) % 1
   ctx.fillStyle = '#22ff66'
   for (let i = 0; i < 3; i += 1) {

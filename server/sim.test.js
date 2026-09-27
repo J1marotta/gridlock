@@ -139,18 +139,24 @@ describe('gridlock items', () => {
 })
 
 describe('gridlock pits and tires', () => {
-  it('bald tires force a stop, crew timing resets them', () => {
+  it('players request service from the pit lane and receive fresh tyres', () => {
     const race = testRace()
     const [me] = race.cars
     me.wear = 120
     me.x = 300; me.y = 832; me.vx = 0; me.vy = 0
-    for (let t = 0; t < 1500; t += 50) stepRace(race, 0.05, t)
-    expect(me.pitState).toBe('crew')
     expect(pressPit(race, me)).toBe(true)
     expect(me.pitState).toBe('working')
-    for (let t = 1500; t < 8000 && me.pitState !== 'none'; t += 50) stepRace(race, 0.05, t)
+    for (let t = 0; t < 4000 && me.pitState !== 'none'; t += 50) stepRace(race, 0.05, t)
     expect(me.wear).toBe(0)
     expect(me.pitState).toBe('none')
+  })
+
+  it('does not start service away from the pit lane or with fresh tyres', () => {
+    const race = testRace()
+    const [me] = race.cars
+    expect(pressPit(race, me)).toBe(false)
+    me.x = 300; me.y = 832; me.wear = 0
+    expect(pressPit(race, me)).toBe(false)
   })
 
   it('worn rubber is slower than fresh', () => {

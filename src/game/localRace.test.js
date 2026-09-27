@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { aiInput, aiItems } from '../../server/sim.js'
 import { LocalRace } from './localRace.js'
+import { inPitZone } from './track.js'
 
 describe('LocalRace full solo race', () => {
   it('an AI-driven human completes laps: pits, items, traffic, winner', () => {
@@ -28,7 +29,7 @@ describe('LocalRace full solo race', () => {
       const ai = aiInput(race.race, me())
       race.setInput(ai.steer, ai.throttle)
       aiItems(race.race, me())
-      if (me().pitState === 'crew') race.pressSpace()
+      if (me().pitState === 'none' && me().wear >= 10 && inPitZone(race.race.track, me().x, me().y) && Math.hypot(me().vx, me().vy) < 30) race.pitPress()
       if (me().pitState !== 'none') sawPit = true
       race.tick(now, 50)
     }

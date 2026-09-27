@@ -37,9 +37,14 @@ export class LocalRace {
   pressSpace() {
     const car = this.race.cars[0]
     if (!car || this.race.phase !== 'racing') return false
-    if (car.pitState === 'crew') return pressPit(this.race, car)
     if (car.item) return useItem(this.race, car)
     return false
+  }
+
+  pitPress() {
+    const car = this.race.cars[0]
+    if (!car || this.race.phase !== 'racing') return false
+    return pressPit(this.race, car)
   }
 
   tick(nowMs = Date.now(), dtMs = 50) {

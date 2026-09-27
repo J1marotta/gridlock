@@ -10,7 +10,7 @@ import { LocalRace } from './game/localRace.js'
 import AdminPanel from './game/AdminPanel.jsx'
 import TrackStudio, { STUDIO_SLOTS } from './game/TrackStudio.jsx'
 import { TRACKS, getTrackData } from './game/tracks.js'
-import { trackFromData } from './game/track.js'
+import { inPitZone, trackFromData } from './game/track.js'
 
 function useTransport() {
   const ref = useRef(null)
@@ -213,18 +213,19 @@ export default function GridApp() {
     audioRef.current.ensure()
     if (mode === 'local') {
       const car = localRef.current?.race.cars[0]
-      if (car?.pitState === 'crew') audioRef.current.pit()
-      else if (car?.item) audioRef.current.pickup()
+      if (car?.item) audioRef.current.pickup()
       localRef.current?.pressSpace()
     } else {
-      if (localCar?.pit === 'crew') {
-        audioRef.current.pit()
-        try { transport.pitPress() } catch { /* noop */ }
-      } else {
-        audioRef.current.pickup()
-        try { transport.useItem() } catch { /* noop */ }
-      }
+      if (localCar?.item) audioRef.current.pickup()
+      try { transport.useItem() } catch { /* noop */ }
     }
+  }
+
+  function pressPit() {
+    const started = mode === 'local'
+      ? localRef.current?.pitPress()
+      : (() => { try { transport.pitPress(); return true } catch { return false } })()
+    if (started) audioRef.current.pit()
   }
 
   useEffect(() => {
@@ -244,6 +245,7 @@ export default function GridApp() {
       else if (e.code === 'ArrowLeft' || e.code === 'KeyA') k.left = true
       else if (e.code === 'ArrowRight' || e.code === 'KeyD') k.right = true
       else if (e.code === 'Space') { if (!e.repeat) pressSpace() }
+      else if (e.code === 'KeyP') { if (!e.repeat) pressPit() }
       else handled = false
       if (handled) {
         e.preventDefault()
@@ -379,6 +381,7 @@ export default function GridApp() {
   }
 
   const chips = [...(view?.cars ?? [])].sort((a, b) => (a.place || 99) - (b.place || 99))
+  const activeTrack = mode === 'local' && localRef.current ? localRef.current.race.track : netTrack
 
   return (
     <div className="grid-shell">
@@ -412,7 +415,7 @@ export default function GridApp() {
                 </label>
               </div>
               <p className="dim small">
-                ↑ gas · ↓ brake · ← → steer · Space item / pit timing · <kbd>~</kbd> live tune panel.
+                ↑ gas · ↓ brake · ← → steer · Space item · P pit · <kbd>~</kbd> live tune panel.
                 Tires wear — the pit crew runs out when you box. Endpoint: {getColyseusEndpoint()}
               </p>
             </div>
@@ -473,12 +476,14 @@ export default function GridApp() {
             <div className="race-screen">
               <RaceCanvas
                 view={view} audio={audioRef.current} mySeat={mySeat} mobilePlay={mobilePlay}
-                track={mode === 'local' && localRef.current ? localRef.current.race.track : netTrack}
+                track={activeTrack}
               />
               {mobilePlay && screen !== 'finished' && <TouchControls
                 view={view}
                 onSteer={(side, pressed) => { keysRef.current[side] = pressed; sendDrive() }}
                 onAction={pressSpace}
+                onPit={pressPit}
+                track={activeTrack}
               />}
             </div>
             {screen === 'finished' && (
@@ -620,9 +625,9 @@ function RaceCanvas({ view, audio, mySeat, track, mobilePlay }) {
   )
 }
 
-function TouchControls({ view, onSteer, onAction }) {
+function TouchControls({ view, onSteer, onAction, onPit, track }) {
   const car = view?.cars.find(c => c.seat === view.localSeat)
-  const actionLabel = car?.pit === 'crew' ? 'STOP!' : car?.item ? `USE ${ITEM_LABEL[car.item] ?? 'ITEM'}` : 'NO ITEM'
+  const canPit = Boolean(track && car && car.pit === 'none' && car.wear >= 10 && inPitZone(track, car.x, car.y))
   const hold = (side, pressed) => e => {
     e.preventDefault()
     if (pressed) e.currentTarget.setPointerCapture?.(e.pointerId)
@@ -632,7 +637,8 @@ function TouchControls({ view, onSteer, onAction }) {
     <button className="touch-steer" aria-label="Steer left" onPointerDown={hold('left', true)} onPointerUp={hold('left', false)} onPointerCancel={hold('left', false)} onLostPointerCapture={hold('left', false)}>◀</button>
     <div className="touch-hint">AUTO<br />GAS</div>
     <button className="touch-steer" aria-label="Steer right" onPointerDown={hold('right', true)} onPointerUp={hold('right', false)} onPointerCancel={hold('right', false)} onLostPointerCapture={hold('right', false)}>▶</button>
-    <button className="touch-action" onClick={onAction}>{actionLabel}</button>
+    <button className="touch-action" onClick={onAction} disabled={!car?.item}>{car?.item ? `USE ${ITEM_LABEL[car.item] ?? 'ITEM'}` : 'NO ITEM'}</button>
+    <button className="touch-pit" onClick={onPit} disabled={!canPit} aria-label="Pit for fresh tyres">{car?.pit === 'working' ? 'SERVICING…' : canPit ? 'PIT FOR TYRES' : 'PIT'}</button>
   </div>
 }
 

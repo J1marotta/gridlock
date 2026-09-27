@@ -285,7 +285,7 @@ function stepCar(race, car, dt) {
     if (Math.hypot(car.x - hz.x, car.y - hz.y) < CAR_R + 13) hitHazard(race, car, hz)
   }
 
-  if (car.pitState === 'none' && car.pitArmed && inPitZone(race.track, car.x, car.y)) {
+  if (car.isNpc && car.pitState === 'none' && car.pitArmed && inPitZone(race.track, car.x, car.y)) {
     if (Math.hypot(car.vx, car.vy) < 30) {
       car.pitHoldMs += dt * 1000
       if (car.pitHoldMs >= tune.pit.boxHoldMs) {
@@ -507,11 +507,17 @@ export function stepRace(race, dt, nowMs) {
 }
 
 export function pressPit(race, car) {
-  if (car.pitState === 'crew') {
-    resolvePit(race, car)
-    return true
-  }
-  return false
+  if (!car || car.finished || car.pitState !== 'none' || car.isNpc) return false
+  if (!inPitZone(race.track, car.x, car.y) || car.wear < 10) return false
+  car.pitState = 'working'
+  car.pitGrade = 'SERVICE'
+  car.pitWorkMs = Math.max(0, race.tune.pit.crewBaseMs) + 900
+  car.pitArmed = false
+  car.pitHoldMs = 0
+  car.vx = 0
+  car.vy = 0
+  logEvent(race, 'pit', `🔧 ${car.name} pits for fresh tyres`, car.seat)
+  return true
 }
 
 export function startCountdown(race, nowMs) {
