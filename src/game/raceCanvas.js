@@ -13,10 +13,11 @@ export function decorFor(track) {
 export const ITEM_GLYPH = { boost: '🚀', oil: '🛢' }
 export const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL SPILL' }
 
-export function renderRace(ctx, W, H, view, nowMs, track = TRACK) {
-  const s = Math.min(W / WORLD_W, H / WORLD_H)
-  const ox = (W - WORLD_W * s) / 2
-  const oy = (H - WORLD_H * s) / 2
+export function renderRace(ctx, W, H, view, nowMs, track = TRACK, followSeat = -1) {
+  const focus = (view?.cars ?? []).find(c => c.seat === followSeat)
+  const s = Math.min(W / WORLD_W, H / WORLD_H) * (focus ? 2.35 : 1)
+  const ox = focus ? W / 2 - focus.x * s : (W - WORLD_W * s) / 2
+  const oy = focus ? H / 2 - focus.y * s : (H - WORLD_H * s) / 2
   ctx.save()
   ctx.fillStyle = '#0b0714'
   ctx.fillRect(0, 0, W, H)

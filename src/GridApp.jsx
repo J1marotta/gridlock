@@ -62,6 +62,7 @@ export default function GridApp() {
   const [localVersion, setLocalVersion] = useState(0)
   const [netTune, setNetTune] = useState(() => cloneTune())
   const keysRef = useRef({ up: false, down: false, left: false, right: false })
+  const [mobilePlay, setMobilePlay] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches)
   const lastInputSent = useRef('')
   const lastCount = useRef(-1)
   const lastResultKey = useRef('')
@@ -94,6 +95,27 @@ export default function GridApp() {
   }
   const mySeat = mode === 'local' ? 0 : (privateState?.seat ?? -1)
   const localCar = view?.cars.find(c => c.seat === mySeat)
+
+  useEffect(() => {
+    const media = window.matchMedia?.('(pointer: coarse)')
+    if (!media) return undefined
+    const update = () => setMobilePlay(media.matches)
+    media.addEventListener?.('change', update)
+    return () => media.removeEventListener?.('change', update)
+  }, [])
+
+  useEffect(() => {
+    if (!mobilePlay || (screen !== 'countdown' && screen !== 'racing')) return
+    keysRef.current.up = true
+    sendDrive()
+    return () => {
+      keysRef.current.up = false
+      keysRef.current.left = false
+      keysRef.current.right = false
+      keysRef.current.down = false
+      sendDrive()
+    }
+  }, [mobilePlay, screen, mode])
 
   useEffect(() => {
     const off1 = transport.subscribe('snapshot', snap => {
@@ -408,10 +430,17 @@ export default function GridApp() {
 
         {(screen === 'countdown' || screen === 'racing' || screen === 'finished') && view && (
           <>
-            <RaceCanvas
-              view={view} audio={audioRef.current} mySeat={mySeat}
-              track={mode === 'local' && localRef.current ? localRef.current.race.track : netTrack}
-            />
+            <div className="race-screen">
+              <RaceCanvas
+                view={view} audio={audioRef.current} mySeat={mySeat} mobilePlay={mobilePlay}
+                track={mode === 'local' && localRef.current ? localRef.current.race.track : netTrack}
+              />
+              {mobilePlay && screen !== 'finished' && <TouchControls
+                view={view}
+                onSteer={(side, pressed) => { keysRef.current[side] = pressed; sendDrive() }}
+                onAction={pressSpace}
+              />}
+            </div>
             {screen === 'finished' && (
               <div className="grid-card" ref={resultRef}>
                 <div className="winner-banner">🏁 {view.winnerName} WINS 🏁</div>
@@ -495,7 +524,7 @@ function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, inRoom
   )
 }
 
-function RaceCanvas({ view, audio, mySeat, track }) {
+function RaceCanvas({ view, audio, mySeat, track, mobilePlay }) {
   const canvasRef = useRef(null)
   const viewRef = useRef(view)
   viewRef.current = view
@@ -509,7 +538,7 @@ function RaceCanvas({ view, audio, mySeat, track }) {
     let wasSpinning = false
     let lastItem = ''
     const loop = () => {
-      renderRace(ctx, canvas.width, canvas.height, viewRef.current, performance.now(), trackRef.current)
+      renderRace(ctx, canvas.width, canvas.height, viewRef.current, performance.now(), trackRef.current, mobilePlay ? mySeat : -1)
       const local = viewRef.current?.cars.find(c => c.seat === (viewRef.current?.localSeat ?? mySeat))
       if (local) {
         audio.engine(local.speed, viewRef.current.phase === 'racing')
@@ -525,13 +554,39 @@ function RaceCanvas({ view, audio, mySeat, track }) {
     raf = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(raf)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [audio])
+  }, [audio, mobilePlay, mySeat])
   return (
     <div className="road-wrap scanlines">
       <canvas ref={canvasRef} width={1280} height={720} />
+      {mobilePlay && <RaceMiniMap view={view} track={track} />}
       <div className="race-feed">
         {(view?.events ?? []).slice(-3).map((e, i) => <span key={i} className={e.kind}>{e.text}</span>)}
       </div>
     </div>
   )
+}
+
+function TouchControls({ view, onSteer, onAction }) {
+  const car = view?.cars.find(c => c.seat === view.localSeat)
+  const actionLabel = car?.pit === 'crew' ? 'STOP!' : car?.item ? `USE ${ITEM_LABEL[car.item] ?? 'ITEM'}` : 'NO ITEM'
+  const hold = (side, pressed) => e => {
+    e.preventDefault()
+    if (pressed) e.currentTarget.setPointerCapture?.(e.pointerId)
+    onSteer(side, pressed)
+  }
+  return <div className="touch-controls" aria-label="Driving controls">
+    <button className="touch-steer" aria-label="Steer left" onPointerDown={hold('left', true)} onPointerUp={hold('left', false)} onPointerCancel={hold('left', false)} onLostPointerCapture={hold('left', false)}>◀</button>
+    <div className="touch-hint">AUTO<br />GAS</div>
+    <button className="touch-steer" aria-label="Steer right" onPointerDown={hold('right', true)} onPointerUp={hold('right', false)} onPointerCancel={hold('right', false)} onLostPointerCapture={hold('right', false)}>▶</button>
+    <button className="touch-action" onClick={onAction}>{actionLabel}</button>
+  </div>
+}
+
+function RaceMiniMap({ view, track }) {
+  if (!track?.points?.length) return null
+  const path = track.points.map(([x, y], i) => `${i ? 'L' : 'M'} ${x / 10} ${y / 10}`).join(' ') + ' Z'
+  return <svg className="race-minimap" viewBox="0 0 160 90" aria-label="Track positions">
+    <path d={path} />
+    {(view?.cars ?? []).map(c => <circle key={c.seat} cx={c.x / 10} cy={c.y / 10} r={c.seat === view.localSeat ? 2.8 : 1.8} className={c.seat === view.localSeat ? 'you' : ''} />)}
+  </svg>
 }
