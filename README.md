@@ -9,7 +9,7 @@ React shell + canvas track).
 
 ## The game
 
-- **Track library**: Speedway circle (default), Riverside Park, Hairpin Alley,
+- **Track library**: Switchback Park (default), Speedway circle, Hairpin Alley,
   The Esses — plus anything painted in the Track Studio. Solo and the host
   pick from premade + studio saves; the host can upload a studio loop online.
 - **12 cars**, bots fill the grid. 3 laps (tunable), checkpoints validate laps.

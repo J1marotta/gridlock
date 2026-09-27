@@ -8,7 +8,7 @@ import {
   validateClientMessage,
 } from '../src/multiplayer/protocol.js'
 import { applyPatch, applyRacePreset, cloneTune, RACE_PRESETS } from '../src/game/tune.js'
-import { getTrack, getTrackData } from '../src/game/tracks.js'
+import { DEFAULT_TRACK_ID, getTrack, getTrackData } from '../src/game/tracks.js'
 import { trackFromData } from '../src/game/track.js'
 import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from './sim.js'
 import { BoxState, CarState, FeedEvent, GridState, HazardState, PlayerState, VanState } from './schema.js'
@@ -62,8 +62,8 @@ export class GridRoom extends Room {
       winnerEventId: '',
       hostPlayerId: '',
       tuneJson: JSON.stringify(this.tune),
-      trackJson: JSON.stringify(getTrackData('speedway').data),
-      trackName: 'Speedway',
+      trackJson: JSON.stringify(getTrackData(DEFAULT_TRACK_ID).data),
+      trackName: getTrackData(DEFAULT_TRACK_ID).name,
       activePreset: 'balanced',
       presetVotesJson: '{}',
     })
@@ -242,8 +242,8 @@ export class GridRoom extends Room {
     this.state.winnerName = ''
     this.state.winnerSeat = -1
     this.state.tuneJson = JSON.stringify(this.tune)
-    this.state.trackJson = JSON.stringify(this.pendingTrackData ?? getTrackData('speedway').data)
-    this.state.trackName = this.pendingTrackData?.name ?? 'Speedway'
+    this.state.trackJson = JSON.stringify(this.pendingTrackData ?? getTrackData(DEFAULT_TRACK_ID).data)
+    this.state.trackName = this.pendingTrackData?.name ?? getTrackData(DEFAULT_TRACK_ID).name
     this.state.phase = 'countdown'
     this.syncWorld(now)
     return { ok: true }
@@ -254,7 +254,7 @@ export class GridRoom extends Room {
       const verify = trackFromData(this.pendingTrackData)
       if (verify.ok) return verify.track
     }
-    return getTrack('speedway')
+    return getTrack(DEFAULT_TRACK_ID)
   }
 
   sendPrivate(playerId, seat) {

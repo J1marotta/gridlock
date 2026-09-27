@@ -3,14 +3,14 @@ import { DEFAULT_TRACK_ID, TRACKS, getTrack, getTrackData } from './tracks.js'
 import { trackFromData } from './track.js'
 
 describe('track library', () => {
-  it('speedway circle is the default', () => {
-    expect(DEFAULT_TRACK_ID).toBe('speedway')
-    expect(getTrackData('nope').id).toBe('speedway')
+  it('Switchback Park is the default', () => {
+    expect(DEFAULT_TRACK_ID).toBe('switchback')
+    expect(getTrackData('nope').id).toBe('switchback')
     expect(getTrack('speedway')).toBe(getTrack('speedway')) // cached
   })
 
   it('every premade validates and has the full kit', () => {
-    expect(TRACKS.length).toBe(3)
+    expect(TRACKS.length).toBe(4)
     for (const t of TRACKS) {
       const res = trackFromData(t.data)
       expect(res.ok, t.id).toBe(true)

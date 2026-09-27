@@ -1,7 +1,7 @@
 // Solo mode: the authoritative sim running locally.
 import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from '../../server/sim.js'
 import { trackFromData } from './track.js'
-import { getTrackData } from './tracks.js'
+import { DEFAULT_TRACK_ID, getTrackData } from './tracks.js'
 import { cloneTune } from './tune.js'
 
 const BOT_NAMES = ['Vex', 'Turbo', 'Skidz', 'Octane', 'Drifty', 'Nitro', 'Sparks', 'Axel', 'Gear', 'Ruby', 'Max']
@@ -9,7 +9,7 @@ const BOT_NAMES = ['Vex', 'Turbo', 'Skidz', 'Octane', 'Drifty', 'Nitro', 'Sparks
 export class LocalRace {
   constructor({ playerName = 'Racer', tune = null, trackData = null } = {}) {
     this.tune = tune ?? cloneTune()
-    const data = trackData ?? getTrackData('speedway').data
+    const data = trackData ?? getTrackData(DEFAULT_TRACK_ID).data
     const custom = trackFromData(data)
     if (!custom.ok) throw new Error(custom.error)
     this.trackName = data?.name ?? 'Speedway'

@@ -9,7 +9,7 @@ import { GridAudio } from './game/audio.js'
 import { LocalRace } from './game/localRace.js'
 import AdminPanel from './game/AdminPanel.jsx'
 import TrackStudio, { STUDIO_SLOTS } from './game/TrackStudio.jsx'
-import { TRACKS, getTrackData } from './game/tracks.js'
+import { DEFAULT_TRACK_ID, TRACKS, getTrackData } from './game/tracks.js'
 import { inPitZone, trackFromData } from './game/track.js'
 
 function useTransport() {
@@ -28,7 +28,7 @@ function adaptNetView(snapshot, privateState, tune) {
     roomCode: snapshot.roomCode,
     raceNo: snapshot.raceNo,
     laps: tune.race.laps,
-    trackName: snapshot.trackName ?? 'Speedway',
+    trackName: snapshot.trackName ?? 'Switchback Park',
     countdownEndsAt: snapshot.countdownEndsAt,
     winnerName: snapshot.winnerName,
     winnerSeat: snapshot.winnerSeat,
@@ -62,8 +62,8 @@ export default function GridApp() {
   const [closedMsg, setClosedMsg] = useState('')
   const [muted, setMuted] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
-  const [soloTrack, setSoloTrack] = useState(() => localStorage.getItem('gridlock-track') || 'speedway')
-  const [hostTrack, setHostTrack] = useState('speedway')
+  const [soloTrack, setSoloTrack] = useState(() => localStorage.getItem('gridlock-track') || DEFAULT_TRACK_ID)
+  const [hostTrack, setHostTrack] = useState(DEFAULT_TRACK_ID)
   const localRef = useRef(null)
   const localTuneRef = useRef(null)
   const [localVersion, setLocalVersion] = useState(0)
@@ -438,7 +438,7 @@ export default function GridApp() {
         {screen === 'lobby' && view && (
           <div className="grid-card">
             <h2>LOBBY — {view.roomCode}</h2>
-            <p className="dim">TRACK: <b>{view.trackName || 'Speedway'}</b></p>
+            <p className="dim">TRACK: <b>{view.trackName || 'Switchback Park'}</b></p>
             <p className="dim">NEXT RACE FEEL: <b>{RACE_PRESETS.find(p => p.id === view.activePreset)?.name ?? 'Grip Hero'}</b></p>
             <ul className="nitro-players">
               {view.players.map(p => (

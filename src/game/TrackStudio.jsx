@@ -170,6 +170,7 @@ export default function TrackStudio({ onTestDrive, onExit }) {
   function onCanvasDown(e) {
     e.preventDefault()
     if (tool === 'paint' || !result?.ok) {
+      e.currentTarget.setPointerCapture?.(e.pointerId)
       if (tool !== 'paint') setTool('paint')
       setResult(null)
       setPainting(true)

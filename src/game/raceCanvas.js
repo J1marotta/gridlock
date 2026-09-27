@@ -1,7 +1,8 @@
-import { WORLD_H, WORLD_W, buildDecor, buildTrack } from './track.js'
+import { WORLD_H, WORLD_W, buildDecor, closestOnTrack } from './track.js'
+import { DEFAULT_TRACK_ID, getTrack } from './tracks.js'
 import { SEAT_COLORS } from '../../server/sim.js'
 
-const TRACK = buildTrack()
+const TRACK = getTrack(DEFAULT_TRACK_ID)
 const DECOR = buildDecor(TRACK, 7)
 const decorCache = new WeakMap()
 export function decorFor(track) {
@@ -218,6 +219,22 @@ export function trackPath(ctx, points) {
 
 function drawPit(ctx, track, nowMs) {
   const pit = track.pit
+  const u = { x: Math.cos(pit.angle), y: Math.sin(pit.angle) }
+  ctx.save()
+  ctx.lineCap = 'round'
+  for (const end of [-1, 1]) {
+    const ex = pit.cx + u.x * pit.length / 2 * end
+    const ey = pit.cy + u.y * pit.length / 2 * end
+    const road = closestOnTrack(track, ex, ey)
+    ctx.strokeStyle = '#55555f'
+    ctx.lineWidth = Math.max(30, track.halfWidth * 1.18)
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(road.px, road.py); ctx.stroke()
+    ctx.strokeStyle = 'rgba(255,255,255,0.78)'
+    ctx.lineWidth = 2
+    ctx.setLineDash([12, 10])
+    ctx.beginPath(); ctx.moveTo(ex, ey); ctx.lineTo(road.px, road.py); ctx.stroke()
+  }
+  ctx.restore()
   ctx.save()
   ctx.translate(pit.cx, pit.cy)
   ctx.rotate(pit.angle)

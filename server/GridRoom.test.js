@@ -73,7 +73,7 @@ describe('GridRoom race flow', () => {
     const guest = mockClient('s-g2')
     room.onJoin(host, { playerName: 'Alf' })
     room.onJoin(guest, { playerName: 'Bob' })
-    expect(room.state.trackName).toBe('Speedway')
+    expect(room.state.trackName).toBe('Switchback Park')
 
     // guest cannot pick, junk is rejected
     expect(cmd(room, guest, 'set-track', { track: { points: [] } }).ok).toBe(false)
