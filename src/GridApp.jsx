@@ -9,8 +9,9 @@ import { GridAudio } from './game/audio.js'
 import { LocalRace } from './game/localRace.js'
 import AdminPanel from './game/AdminPanel.jsx'
 import TrackStudio, { STUDIO_SLOTS } from './game/TrackStudio.jsx'
-import { DEFAULT_TRACK_ID, TRACKS, getTrackData } from './game/tracks.js'
+import { DEFAULT_TRACK_ID, TRACKS, getTrackData, getTrackVoteOptions } from './game/tracks.js'
 import { inPitZone, trackFromData } from './game/track.js'
+import { decodeTrackCode } from './game/trackShare.js'
 
 function useTransport() {
   const ref = useRef(null)
@@ -22,7 +23,9 @@ function adaptNetView(snapshot, privateState, tune) {
   if (!snapshot) return null
   const map = m => (m instanceof Map ? [...m.values()] : Object.values(m ?? {}))
   let presetVotes = {}
+  let trackVotes = {}
   try { presetVotes = JSON.parse(snapshot.presetVotesJson || '{}') } catch { /* ignore malformed vote state */ }
+  try { trackVotes = JSON.parse(snapshot.trackVotesJson || '{}') } catch { /* ignore malformed vote state */ }
   return {
     phase: snapshot.phase,
     roomCode: snapshot.roomCode,
@@ -34,6 +37,8 @@ function adaptNetView(snapshot, privateState, tune) {
     winnerSeat: snapshot.winnerSeat,
     activePreset: snapshot.activePreset || 'balanced',
     presetVotes,
+    activeTrackId: snapshot.activeTrackId || DEFAULT_TRACK_ID,
+    trackVotes,
     localSeat: privateState?.seat ?? -1,
     pitZone: { perfectHalf: tune.pit.perfectHalf, okHalf: tune.pit.okHalf },
     players: map(snapshot.players),
@@ -57,6 +62,7 @@ export default function GridApp() {
   const [code, setCode] = useState(() => normalizeRoomCode(new URLSearchParams(window.location.search).get('room') || ''))
   const [shareOpen, setShareOpen] = useState(false)
   const [shareQr, setShareQr] = useState('')
+  const [trackNotice, setTrackNotice] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [closedMsg, setClosedMsg] = useState('')
@@ -153,6 +159,30 @@ export default function GridApp() {
     return () => { active = false }
   }, [transport])
 
+  useEffect(() => {
+    const sharedCode = new URLSearchParams(window.location.search).get('track')
+    if (!sharedCode) return undefined
+    let active = true
+    decodeTrackCode(sharedCode).then(data => {
+      const verified = trackFromData(data)
+      if (!verified.ok) throw new Error(verified.error)
+      localStorage.setItem(STUDIO_SLOTS[0], JSON.stringify(data))
+      if (active) {
+        setSoloTrack('slot:0')
+        setHostTrack('slot:0')
+        setTrackNotice(`Loaded “${data.name || 'Shared track'}” into Track Studio slot 1.`)
+      }
+    }).catch(err => {
+      if (active) setError(`Could not load shared track: ${err?.message || 'Invalid track code'}`)
+    }).finally(() => {
+      if (!active) return
+      const url = new URL(window.location.href)
+      url.searchParams.delete('track')
+      window.history.replaceState({}, '', url)
+    })
+    return () => { active = false }
+  }, [])
+
   const inviteUrl = useMemo(() => {
     if (!view?.roomCode) return ''
     const url = new URL(window.location.href)
@@ -170,6 +200,10 @@ export default function GridApp() {
       .catch(() => { if (active) setShareQr('') })
     return () => { active = false }
   }, [shareOpen, inviteUrl])
+
+  useEffect(() => {
+    if (snapshot?.phase === 'lobby' && snapshot.activeTrackId) setHostTrack(snapshot.activeTrackId)
+  }, [snapshot?.phase, snapshot?.activeTrackId])
 
   function updateRoomLink(roomCode) {
     setCode(roomCode)
@@ -293,6 +327,7 @@ export default function GridApp() {
       localStorage.setItem('gridlock-name', name)
       const roomCode = normalizeRoomCode(code) || randomRoomCode()
       await transport.create({ roomCode, playerName: name.trim() || 'Racer', privacy: 'public' })
+      if (hostTrack.startsWith('slot:')) transport.setTrack(resolveTrackData(hostTrack))
       updateRoomLink(roomCode)
       setMode('net')
       setScreen('lobby')
@@ -400,6 +435,7 @@ export default function GridApp() {
           <div className="menu-grid">
             <div className="grid-card">
               <h2>GRIDLOCK</h2>
+              {trackNotice && <p className="grid-notice">🛣 {trackNotice}</p>}
               <p className="dim">Top-down traffic racer. Whole track, all rivals, always visible.</p>
               <div className="nitro-row">
                 <input className="g-input" value={name} onChange={e => setName(e.target.value)} placeholder="Your name" maxLength={16} style={{ width: 150 }} />
@@ -500,6 +536,13 @@ export default function GridApp() {
                   playerId={privateState?.playerId}
                   onVote={presetId => { try { transport.votePreset(presetId) } catch { /* noop */ } }}
                 />}
+                {mode === 'net' && <TrackVote
+                  currentTrackId={view.activeTrackId}
+                  raceNo={view.raceNo}
+                  votes={view.trackVotes}
+                  playerId={privateState?.playerId}
+                  onVote={trackId => { try { transport.voteTrack(trackId) } catch { /* noop */ } }}
+                />}
                 <table className="standings">
                   <thead><tr><th>POS</th><th>RACER</th><th>BEST LAP</th><th>WINS</th></tr></thead>
                   <tbody>
@@ -520,7 +563,7 @@ export default function GridApp() {
                   {mode === 'local' ? (
                     <button className="nitro-btn go" onClick={soloRematch}>REMATCH →</button>
                   ) : isHost() ? (
-                    <button className="nitro-btn go" onClick={() => transport.nextRace()}>APPLY VOTE & NEXT RACE →</button>
+                    <button className="nitro-btn go" onClick={() => transport.nextRace()}>APPLY VOTES & NEXT RACE →</button>
                   ) : <span className="dim">Waiting for host…</span>}
                 </div>
               </div>
@@ -588,6 +631,34 @@ function PresetVote({ activePreset, votes = {}, playerId, onVote }) {
         <span className="preset-name">{preset.icon} {preset.name}</span>
         <span className="preset-feel">{preset.feel}</span>
         <span className="preset-count" aria-label={`${counts[preset.id] ?? 0} votes`}>{counts[preset.id] ?? 0} votes</span>
+      </button>)}
+    </div>
+  </section>
+}
+
+function TrackVote({ currentTrackId, raceNo, votes = {}, playerId, onVote }) {
+  const choices = getTrackVoteOptions(currentTrackId, raceNo)
+  const currentVote = playerId ? votes[playerId] : ''
+  const counts = Object.values(votes).reduce((all, id) => ({ ...all, [id]: (all[id] ?? 0) + 1 }), {})
+  return <section className="preset-votes track-votes" aria-labelledby="track-vote-title">
+    <div className="preset-vote-head">
+      <div>
+        <h3 id="track-vote-title">Pick the next circuit</h3>
+        <p className="dim small">Choose one of three tracks. The host applies the result with the handling vote; ties go to the first card.</p>
+      </div>
+      <span className="vote-total">{Object.keys(votes).length} vote{Object.keys(votes).length === 1 ? '' : 's'}</span>
+    </div>
+    <div className="preset-options" role="group" aria-label="Choose the next circuit">
+      {choices.map(track => <button
+        key={track.id}
+        type="button"
+        className={`preset-choice track-choice ${currentVote === track.id ? 'selected' : ''}`}
+        aria-pressed={currentVote === track.id}
+        onClick={() => onVote(track.id)}
+      >
+        <span className="preset-name">🏁 {track.name}</span>
+        <span className="preset-feel">{track.blurb}</span>
+        <span className="preset-count" aria-label={`${counts[track.id] ?? 0} votes`}>{counts[track.id] ?? 0} votes</span>
       </button>)}
     </div>
   </section>

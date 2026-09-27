@@ -64,6 +64,12 @@ export function getTrackData(id) {
   return TRACKS.find(t => t.id === id) ?? TRACKS.find(t => t.id === DEFAULT_TRACK_ID)
 }
 
+export function getTrackVoteOptions(currentTrackId, seed = 1) {
+  const pool = TRACKS.filter(t => t.id !== currentTrackId)
+  const start = Math.abs(Math.floor(seed)) % pool.length
+  return Array.from({ length: Math.min(3, pool.length) }, (_, i) => pool[(start + i) % pool.length])
+}
+
 const cache = new Map()
 export function getTrack(id) {
   if (!cache.has(id)) {

@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run --environment node server src/game/tune.test.js src/game/track.test.js src/game/trackEdit.test.js src/game/tracks.test.js src/game/localRace.test.js src/multiplayer/protocol.test.js",
+    "test": "vitest run --environment node server src/game/tune.test.js src/game/track.test.js src/game/trackEdit.test.js src/game/tracks.test.js src/game/trackShare.test.js src/game/localRace.test.js src/multiplayer/protocol.test.js",
     "lint": "oxlint",
     "preview": "vite preview",
     "dev:colyseus": "node --watch server/index.js",

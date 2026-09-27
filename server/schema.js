@@ -74,6 +74,8 @@ export const GridState = schema({
   tuneJson: 'string',
   trackJson: 'string',
   trackName: 'string',
+  activeTrackId: 'string',
+  trackVotesJson: 'string',
   activePreset: 'string',
   presetVotesJson: 'string',
   players: { map: PlayerState, default: new MapSchema() },

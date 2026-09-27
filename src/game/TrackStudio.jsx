@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { WORLD_H, WORLD_W, trackFromData } from './track.js'
 import { levelRuns } from './raceCanvas.js'
+import { decodeTrackCode, encodeTrackCode } from './trackShare.js'
 import {
   clearanceAt, finalizeTrack, placePitAt, rawLength, resampleClosed,
   smoothClosed, snapToLoop, validateLoop,
@@ -246,9 +247,11 @@ export default function TrackStudio({ onTestDrive, onExit }) {
     setMsg('Downloaded + copied to clipboard')
   }
 
-  function importJson(text) {
+  async function importJson(text) {
     try {
-      const data = JSON.parse(text)
+      const source = text.trim()
+      const maybeUrl = source.startsWith('http') ? new URL(source).searchParams.get('track') : source
+      const data = maybeUrl.startsWith('GL1') ? await decodeTrackCode(maybeUrl) : JSON.parse(maybeUrl)
       const verify = trackFromData(data)
       if (!verify.ok) {
         setMsg(`Import rejected: ${verify.error}`)
@@ -261,8 +264,20 @@ export default function TrackStudio({ onTestDrive, onExit }) {
       setTool('pit')
       setMsg(`Imported "${data.name || 'loop'}" — TEST DRIVE when ready`)
     } catch {
-      setMsg('Import rejected: not valid JSON')
+      setMsg('Import rejected: paste a valid track JSON or share code')
     }
+  }
+
+  async function copyTrackCode(asLink = false) {
+    if (!result?.ok) return
+    try {
+      const code = await encodeTrackCode(result.data)
+      const url = new URL(window.location.href)
+      url.search = ''
+      url.searchParams.set('track', code)
+      await navigator.clipboard?.writeText(asLink ? url.toString() : code)
+      setMsg(asLink ? 'Track link copied — it opens directly in Gridlock' : 'Track code copied — paste it into the import box')
+    } catch { setMsg('Could not copy track code — try Export JSON') }
   }
 
   function saveSlot(i) {
@@ -352,6 +367,8 @@ export default function TrackStudio({ onTestDrive, onExit }) {
         <>
           <div className="nitro-row" style={{ marginTop: 8 }}>
             <button className="nitro-btn primary" onClick={() => onTestDrive(result.data)}>🏁 TEST DRIVE</button>
+            <button className="nitro-btn" onClick={() => copyTrackCode(false)}>🔗 SHARE CODE</button>
+            <button className="nitro-btn" onClick={() => copyTrackCode(true)}>COPY TRACK LINK</button>
             <button className="nitro-btn" onClick={exportJson}>⬇ EXPORT JSON</button>
             {[0, 1, 2].map(i => (
               <span key={i} className="nitro-row">

@@ -8,7 +8,7 @@ import {
   validateClientMessage,
 } from '../src/multiplayer/protocol.js'
 import { applyPatch, applyRacePreset, cloneTune, RACE_PRESETS } from '../src/game/tune.js'
-import { DEFAULT_TRACK_ID, getTrack, getTrackData } from '../src/game/tracks.js'
+import { DEFAULT_TRACK_ID, getTrack, getTrackData, getTrackVoteOptions, TRACKS } from '../src/game/tracks.js'
 import { trackFromData } from '../src/game/track.js'
 import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from './sim.js'
 import { BoxState, CarState, FeedEvent, GridState, HazardState, PlayerState, VanState } from './schema.js'
@@ -43,6 +43,7 @@ export class GridRoom extends Room {
   race = null
   pendingTrackData = null
   presetVotes = new Map()
+  trackVotes = new Map()
   messages = { command: (client, message) => this.handleCommand(client, message) }
 
   onCreate(options = {}) {
@@ -66,6 +67,8 @@ export class GridRoom extends Room {
       trackName: getTrackData(DEFAULT_TRACK_ID).name,
       activePreset: 'balanced',
       presetVotesJson: '{}',
+      activeTrackId: DEFAULT_TRACK_ID,
+      trackVotesJson: '{}',
     })
     this.setSimulationInterval?.(deltaMs => this.advanceSimulation(deltaMs), SERVER_TICK_MS)
   }
@@ -123,6 +126,7 @@ export class GridRoom extends Room {
     else if (msg.type === CLIENT_MESSAGE_TYPES.USE_ITEM) result = this.useItem(player)
     else if (msg.type === CLIENT_MESSAGE_TYPES.PIT_PRESS) result = this.pitPress(player)
     else if (msg.type === CLIENT_MESSAGE_TYPES.VOTE_PRESET) result = this.votePreset(player, P.presetId)
+    else if (msg.type === CLIENT_MESSAGE_TYPES.VOTE_TRACK) result = this.voteTrack(player, P.trackId)
     else if (msg.type === CLIENT_MESSAGE_TYPES.TUNE) result = this.tuneCmd(player, P.patch)
     else if (msg.type === CLIENT_MESSAGE_TYPES.SET_TRACK) result = this.setTrack(player, P.track)
     else if (msg.type === CLIENT_MESSAGE_TYPES.NEXT_RACE) result = this.nextRace(player)
@@ -167,7 +171,8 @@ export class GridRoom extends Room {
     if (!this.isHost(player)) return { ok: false, error: 'host-only', message: 'Only the host picks the track' }
     const verify = trackFromData(track)
     if (!verify.ok) return { ok: false, error: 'invalid', message: verify.error }
-    this.pendingTrackData = {
+    const builtIn = TRACKS.find(t => t.name === String(track.name || '').slice(0, 24))
+    this.pendingTrackData = builtIn ? null : {
       name: String(track.name || 'Custom Loop').slice(0, 24),
       points: verify.track.points,
       halfWidth: verify.track.halfWidth,
@@ -176,8 +181,9 @@ export class GridRoom extends Room {
       boxes: verify.track.boxes,
       start: verify.track.start,
     }
-    this.state.trackJson = JSON.stringify(this.pendingTrackData)
-    this.state.trackName = this.pendingTrackData.name
+    this.state.activeTrackId = builtIn?.id ?? ''
+    this.state.trackJson = JSON.stringify(builtIn?.data ?? this.pendingTrackData)
+    this.state.trackName = builtIn?.name ?? this.pendingTrackData.name
     return { ok: true }
   }
 
@@ -242,8 +248,8 @@ export class GridRoom extends Room {
     this.state.winnerName = ''
     this.state.winnerSeat = -1
     this.state.tuneJson = JSON.stringify(this.tune)
-    this.state.trackJson = JSON.stringify(this.pendingTrackData ?? getTrackData(DEFAULT_TRACK_ID).data)
-    this.state.trackName = this.pendingTrackData?.name ?? getTrackData(DEFAULT_TRACK_ID).name
+    this.state.trackJson = JSON.stringify(this.pendingTrackData ?? getTrackData(this.state.activeTrackId || DEFAULT_TRACK_ID).data)
+    this.state.trackName = this.pendingTrackData?.name ?? getTrackData(this.state.activeTrackId || DEFAULT_TRACK_ID).name
     this.state.phase = 'countdown'
     this.syncWorld(now)
     return { ok: true }
@@ -254,7 +260,7 @@ export class GridRoom extends Room {
       const verify = trackFromData(this.pendingTrackData)
       if (verify.ok) return verify.track
     }
-    return getTrack(DEFAULT_TRACK_ID)
+    return getTrack(this.state.activeTrackId || DEFAULT_TRACK_ID)
   }
 
   sendPrivate(playerId, seat) {
@@ -275,6 +281,21 @@ export class GridRoom extends Room {
     this.state.tuneJson = JSON.stringify(this.tune)
     this.presetVotes.clear()
     this.state.presetVotesJson = '{}'
+    const trackOptions = getTrackVoteOptions(this.state.activeTrackId, this.state.raceNo)
+    if (this.trackVotes.size) {
+      const trackCounts = Object.fromEntries(trackOptions.map(t => [t.id, 0]))
+      for (const trackId of this.trackVotes.values()) trackCounts[trackId] = (trackCounts[trackId] ?? 0) + 1
+      const maxTrackVotes = Math.max(...Object.values(trackCounts))
+      const selected = trackOptions.find(t => trackCounts[t.id] === maxTrackVotes)
+      if (selected) {
+        this.pendingTrackData = null
+        this.state.activeTrackId = selected.id
+        this.state.trackJson = JSON.stringify(selected.data)
+        this.state.trackName = selected.name
+      }
+    }
+    this.trackVotes.clear()
+    this.state.trackVotesJson = '{}'
     this.state.raceNo += 1
     this.state.phase = 'lobby'
     for (const p of this.state.players.values()) if (p.connected) p.ready = false
@@ -286,6 +307,15 @@ export class GridRoom extends Room {
     if (!RACE_PRESETS.some(p => p.id === presetId)) return { ok: false, error: 'invalid-preset', message: 'Choose one of the listed race feels' }
     this.presetVotes.set(player.id, presetId)
     this.state.presetVotesJson = JSON.stringify(Object.fromEntries(this.presetVotes))
+    return { ok: true }
+  }
+
+  voteTrack(player, trackId) {
+    if (this.state.phase !== 'finished') return { ok: false, error: 'wrong-phase', message: 'Vote after the race finishes' }
+    const choices = getTrackVoteOptions(this.state.activeTrackId, this.state.raceNo)
+    if (!choices.some(t => t.id === trackId)) return { ok: false, error: 'invalid-track', message: 'Choose one of the three listed circuits' }
+    this.trackVotes.set(player.id, trackId)
+    this.state.trackVotesJson = JSON.stringify(Object.fromEntries(this.trackVotes))
     return { ok: true }
   }
 

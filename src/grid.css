@@ -165,6 +165,7 @@
 .preset-name { font-weight: 900; font-size: 14px; }
 .preset-feel { color: #e8f5ff; font-size: 12px; line-height: 1.25; }
 .preset-count { align-self: flex-end; }
+.grid-notice { padding: 8px 10px; border: 1px solid #44ff66; border-radius: 8px; color: #effff2; background: #102619; font-weight: 700; }
 
 @media (max-width: 560px) {
   .preset-votes { padding: 8px; }

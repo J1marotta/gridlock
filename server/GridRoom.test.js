@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { resetActiveRoomCodesForTests, GridRoom } from './GridRoom.js'
+import { getTrackVoteOptions } from '../src/game/tracks.js'
 
 const mockClient = sessionId => ({ sessionId, auth: {}, send: vi.fn() })
 let seq = 0
@@ -54,6 +55,10 @@ describe('GridRoom race flow', () => {
     expect(cmd(room, guest, 'vote-preset', { presetId: 'drift' }).ok).toBe(true)
     expect(cmd(room, host, 'vote-preset', { presetId: 'drift' }).ok).toBe(true)
     expect(JSON.parse(room.state.presetVotesJson)).toEqual({ [room.playerIdBySession.get('s-guest')]: 'drift', [room.playerIdBySession.get('s-host')]: 'drift' })
+    const nextTrack = getTrackVoteOptions(room.state.activeTrackId, room.state.raceNo)[0]
+    expect(cmd(room, host, 'vote-track', { trackId: room.state.activeTrackId }).ok).toBe(false)
+    expect(cmd(room, guest, 'vote-track', { trackId: nextTrack.id }).ok).toBe(true)
+    expect(cmd(room, host, 'vote-track', { trackId: nextTrack.id }).ok).toBe(true)
 
     expect(cmd(room, guest, 'next-race', {}, room.state.raceNo).ok).toBe(false)
     expect(cmd(room, host, 'next-race', {}, room.state.raceNo).ok).toBe(true)
@@ -62,6 +67,9 @@ describe('GridRoom race flow', () => {
     expect(room.state.activePreset).toBe('drift')
     expect(room.tune.car.grip).toBe(6.5)
     expect(room.state.presetVotesJson).toBe('{}')
+    expect(room.state.activeTrackId).toBe(nextTrack.id)
+    expect(room.state.trackName).toBe(nextTrack.name)
+    expect(room.state.trackVotesJson).toBe('{}')
   })
 
   it('host picks premade or studio tracks in the lobby', async () => {

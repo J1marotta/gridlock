@@ -14,19 +14,25 @@ export const TUNE_DEFAULTS = {
 
 export const RACE_PRESETS = [
   {
-    id: 'balanced', name: 'Grip Hero', icon: '🛞', feel: 'Predictable, quick corner exits',
+    id: 'balanced', name: 'Grip Hero', icon: '🛞', feel: 'Predictable turns • standard traffic',
     car: { topMul: 1, accel: 205, brakePow: 340, steerRate: 3, grip: 9.4 },
     tires: { wearRate: 0.82, driftWearMul: 1.55, gripLoss: 0.34, topLoss: 0.26 },
+    items: { boxRespawnMs: 6000, boostTopMul: 1.55, boostMs: 1600, oilSpinMs: 1100 },
+    traffic: { count: 5 },
   },
   {
-    id: 'drift', name: 'Sideways', icon: '💨', feel: 'Loose turns, bigger slides',
+    id: 'drift', name: 'Sideways', icon: '💨', feel: 'Loose turns • more item chaos',
     car: { topMul: 1.03, accel: 205, brakePow: 300, steerRate: 3.65, grip: 6.5 },
     tires: { wearRate: 0.98, driftWearMul: 1.25, gripLoss: 0.38, topLoss: 0.28 },
+    items: { boxRespawnMs: 4800, boostTopMul: 1.55, boostMs: 1600, oilSpinMs: 1300 },
+    traffic: { count: 5 },
   },
   {
-    id: 'turbo', name: 'Redline', icon: '🚀', feel: 'Big speed, twitchier handling',
+    id: 'turbo', name: 'Redline', icon: '🚀', feel: 'High speed • bigger boosts • less traffic',
     car: { topMul: 1.14, accel: 235, brakePow: 300, steerRate: 3.25, grip: 7.2 },
     tires: { wearRate: 1.05, driftWearMul: 1.7, gripLoss: 0.42, topLoss: 0.32 },
+    items: { boxRespawnMs: 4500, boostTopMul: 1.8, boostMs: 2000, oilSpinMs: 1100 },
+    traffic: { count: 2 },
   },
 ]
 
@@ -35,6 +41,8 @@ export function applyRacePreset(tune, presetId) {
   if (!preset) return false
   Object.assign(tune.car, preset.car)
   Object.assign(tune.tires, preset.tires)
+  Object.assign(tune.items, preset.items)
+  Object.assign(tune.traffic, preset.traffic)
   return true
 }
 
