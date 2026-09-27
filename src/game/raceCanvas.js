@@ -30,10 +30,15 @@ export function renderRace(ctx, W, H, view, nowMs, track = TRACK, followSeat = -
   drawHazards(ctx, view, nowMs)
   drawVans(ctx, view, nowMs, false)
   const cars = [...(view?.cars ?? [])].sort((a, b) => (b.finished ? 1 : 0) - (a.finished ? 1 : 0))
-  for (const car of cars) if ((car.level ?? 0) <= 0) drawCar(ctx, view, track, car, nowMs)
+  const drawLevel = level => {
+    const group = cars.filter(car => ((car.level ?? 0) > 0) === level)
+    group.sort((a, b) => Number(a.seat === view?.localSeat) - Number(b.seat === view?.localSeat))
+    for (const car of group) drawCar(ctx, view, track, car, nowMs)
+  }
+  drawLevel(false)
   drawBridges(ctx, track)
   drawVans(ctx, view, nowMs, true)
-  for (const car of cars) if ((car.level ?? 0) > 0) drawCar(ctx, view, track, car, nowMs)
+  drawLevel(true)
   ctx.restore()
   renderOverlays(ctx, W, H, view)
 }
@@ -355,17 +360,26 @@ function drawCar(ctx, view, track, car, nowMs) {
   ctx.fillRect(-15, -9, 31, 21)
   ctx.fillStyle = '#1a1a22'
   ctx.fillRect(-19, -11, 5, 22)
+  ctx.globalAlpha = isLocal ? 1 : 0.72
   ctx.fillStyle = color
-  ctx.strokeStyle = isLocal ? '#fff' : 'rgba(0,0,0,0.6)'
-  ctx.lineWidth = isLocal ? 3 : 2
   ctx.beginPath()
   ctx.roundRect(-15, -10, 31, 20, 5)
   ctx.fill()
+  ctx.globalAlpha = 1
+  if (!isLocal) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)'
+    ctx.lineWidth = 4
+    ctx.stroke()
+  }
+  ctx.strokeStyle = isLocal ? '#fff' : '#101018'
+  ctx.lineWidth = isLocal ? 4 : 2.5
   ctx.stroke()
   ctx.fillStyle = color
+  ctx.globalAlpha = isLocal ? 1 : 0.72
   ctx.beginPath()
   ctx.moveTo(16, -7); ctx.lineTo(24, 0); ctx.lineTo(16, 7)
   ctx.closePath(); ctx.fill()
+  ctx.globalAlpha = 1
   ctx.strokeStyle = 'rgba(0,0,0,0.5)'
   ctx.lineWidth = 1.5
   ctx.stroke()
