@@ -1,14 +1,14 @@
 // Live-tunable variables, read by the sim every tick.
 export const TUNE_DEFAULTS = {
-  race: { laps: 3, countdownMs: 3600, winnerGraceMs: 25000, timeLimitMs: 300000 },
-  car: { topMul: 1, accel: 205, brakePow: 340, reverseTop: 70, steerRate: 3, grip: 9.4, offTopMul: 0.58 },
+  race: { laps: 2, countdownMs: 2400, winnerGraceMs: 15000, timeLimitMs: 300000 },
+  car: { topMul: 1, accel: 205, brakePow: 340, reverseTop: 70, steerRate: 3, grip: 9.4, offTopMul: 0.58, catchupPerPlace: 0.02 },
   tires: { wearRate: 0.82, offWearMul: 2, driftWearMul: 1.55, gripLoss: 0.34, topLoss: 0.26, baldCap: 0.5 },
   items: {
-    boost: true, oil: true,
+    boost: true, oil: true, shield: true,
     boxRespawnMs: 6000, boostTopMul: 1.55, boostMs: 1600,
-    oilSpinMs: 1100, hazardLifeMs: 25000,
+    oilSpinMs: 1100, hazardLifeMs: 25000, shieldMs: 8000,
   },
-  traffic: { count: 5, speed: 100 },
+  traffic: { count: 3, speed: 100 },
   pit: { speedLimit: 150, boxHoldMs: 400, crewBaseMs: 1000, perfectMs: 600, okMs: 1600, slowMs: 3000, perfectHalf: 0.06, okHalf: 0.18, needleSpeed: 1.7 },
 }
 
@@ -58,6 +58,7 @@ export const TUNE_META = {
   'car.steerRate': { label: 'Steering', min: 1, max: 5, step: 0.1 },
   'car.grip': { label: 'Grip', min: 2, max: 14, step: 0.5 },
   'car.offTopMul': { label: 'Grass top ×', min: 0.2, max: 1, step: 0.05 },
+  'car.catchupPerPlace': { label: 'Catch-up ×/place', min: 0, max: 0.08, step: 0.005 },
   'tires.wearRate': { label: 'Tire wear /s', min: 0, max: 5, step: 0.05 },
   'tires.driftWearMul': { label: 'Drift wear ×', min: 1, max: 5, step: 0.1 },
   'tires.offWearMul': { label: 'Off-track wear ×', min: 1, max: 5, step: 0.1 },
@@ -66,12 +67,14 @@ export const TUNE_META = {
   'tires.baldCap': { label: 'Bald top cap ×', min: 0.2, max: 1, step: 0.05 },
   'items.boost': { label: 'Boost enabled', type: 'bool' },
   'items.oil': { label: 'Oil enabled', type: 'bool' },
+  'items.shield': { label: 'Shield enabled', type: 'bool' },
   'items.boxRespawnMs': { label: 'Box respawn (ms)', min: 1000, max: 20000, step: 500 },
   'items.boostTopMul': { label: 'Boost top ×', min: 1, max: 2.5, step: 0.05 },
   'items.boostMs': { label: 'Boost time (ms)', min: 500, max: 5000, step: 100 },
   'items.oilSpinMs': { label: 'Oil spin (ms)', min: 300, max: 3000, step: 100 },
+  'items.shieldMs': { label: 'Shield time (ms)', min: 2000, max: 20000, step: 500 },
   'items.hazardLifeMs': { label: 'Hazard life (ms)', min: 5000, max: 60000, step: 1000 },
-  'traffic.count': { label: 'Traffic vans', type: 'select', options: [0, 2, 5, 8] },
+  'traffic.count': { label: 'Traffic vans', type: 'select', options: [0, 2, 3, 5, 8] },
   'traffic.speed': { label: 'Van speed', min: 40, max: 220, step: 5 },
   'pit.speedLimit': { label: 'Pit speed limit', min: 60, max: 400, step: 10 },
   'pit.boxHoldMs': { label: 'Box hold (ms)', min: 0, max: 2000, step: 100 },

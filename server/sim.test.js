@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cloneTune } from '../src/game/tune.js'
 import { pointAhead } from '../src/game/track.js'
 import {
-  SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem,
+  SEAT_COLORS, addCar, catchupMul, createRace, honk, pressPit, startCountdown, stepRace, useItem,
 } from './sim.js'
 
 function testRace(tunePatch) {
@@ -92,7 +92,7 @@ describe('gridlock driving', () => {
 describe('gridlock items', () => {
   it('disabled items never roll, enabled ones do', () => {
     const tune = cloneTune()
-    Object.assign(tune.items, { boost: false, oil: false })
+    Object.assign(tune.items, { boost: false, oil: false, shield: false })
     const race = createRace(tune)
     addCar(race, { playerId: 'a', name: 'A', color: '#fff', seat: 0 })
     const [me] = race.cars
@@ -121,6 +121,47 @@ describe('gridlock items', () => {
     me.item = 'zap'
     expect(useItem(race, me)).toBe(false)
     expect(me.item).toBe('zap')
+  })
+
+  it('shield pops and eats the next oil slick', () => {
+    const race = testRace()
+    const [me, npc] = race.cars
+    me.item = 'shield'
+    expect(useItem(race, me)).toBe(true)
+    expect(me.shieldUntil).toBeGreaterThan(0)
+    race.hazards.push({ id: 1, kind: 'oil', x: me.x, y: me.y, owner: 'b', until: 60000 })
+    stepRace(race, 0.05, 50)
+    expect(me.spinUntil).toBe(0)
+    expect(me.shieldUntil).toBe(0)
+    expect(race.events.some(e => e.kind === 'shield')).toBe(true)
+    expect(npc.spinUntil).toBe(0)
+  })
+
+  it('horn broadcasts once, then cools down', () => {
+    const race = testRace()
+    const [me] = race.cars
+    expect(honk(race, me)).toBe(true)
+    expect(race.events.some(e => e.kind === 'horn')).toBe(true)
+    expect(honk(race, me)).toBe(false)
+    race.now = 4000
+    expect(honk(race, me)).toBe(true)
+  })
+
+  it('final lap gets a callout', () => {
+    const race = testRace()
+    const [me] = race.cars
+    me.lap = race.tune.race.laps
+    stepRace(race, 0.05, 50)
+    expect(race.finalLapAnnounced).toBe(true)
+    expect(race.events.some(e => e.kind === 'info' && e.text.includes('FINAL LAP'))).toBe(true)
+  })
+
+  it('back markers get a catch-up top-speed bonus', () => {
+    const tune = cloneTune()
+    expect(catchupMul(tune, 1)).toBe(1)
+    expect(catchupMul(tune, 6)).toBe(1)
+    expect(catchupMul(tune, 12)).toBeCloseTo(1.12, 5)
+    expect(catchupMul({ car: { catchupPerPlace: 0 } }, 12)).toBe(1)
   })
 
   it('oil drops behind and the owner is immune', () => {

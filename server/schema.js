@@ -23,6 +23,7 @@ export const CarState = schema({
   speed: 'number',
   lap: 'number',
   place: 'number',
+  progress: 'number',
   level: 'number',
   item: 'string',
   wear: 'number',
@@ -30,6 +31,7 @@ export const CarState = schema({
   needle: 'number',
   boosting: 'boolean',
   spinning: 'boolean',
+  shielding: 'boolean',
   finished: 'boolean',
 })
 

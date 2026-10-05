@@ -12,9 +12,10 @@ describe('tune system', () => {
   })
 
   it('defaults are sane', () => {
-    expect(TUNE_DEFAULTS.race.laps).toBe(3)
+    expect(TUNE_DEFAULTS.race.laps).toBe(2)
     expect(TUNE_DEFAULTS.items.boost).toBe(true)
-    expect(TUNE_DEFAULTS.traffic.count).toBe(5)
+    expect(TUNE_DEFAULTS.items.shield).toBe(true)
+    expect(TUNE_DEFAULTS.traffic.count).toBe(3)
   })
 
   it('every default is covered by panel metadata', () => {
@@ -37,9 +38,11 @@ describe('tune system', () => {
     expect(setByPath(t, 'items.boost', 0)).toBe(true)
     expect(t.items.boost).toBe(false)
     expect(setByPath(t, 'traffic.count', 7)).toBe(false)
-    expect(t.traffic.count).toBe(5)
+    expect(t.traffic.count).toBe(3)
     expect(setByPath(t, 'traffic.count', 8)).toBe(true)
     expect(t.traffic.count).toBe(8)
+    expect(setByPath(t, 'items.shield', 0)).toBe(true)
+    expect(t.items.shield).toBe(false)
     expect(setByPath(t, 'nope.nope', 1)).toBe(false)
     expect(getByPath(t, 'car.grip')).toBe(t.car.grip)
   })

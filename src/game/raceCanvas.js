@@ -11,8 +11,8 @@ export function decorFor(track) {
   return decorCache.get(track)
 }
 
-export const ITEM_GLYPH = { boost: '🚀', oil: '🛢' }
-export const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL SPILL' }
+export const ITEM_GLYPH = { boost: '🚀', oil: '🛢', shield: '🛡' }
+export const ITEM_LABEL = { boost: 'BOOST', oil: 'OIL SPILL', shield: 'SHIELD' }
 
 export function renderRace(ctx, W, H, view, nowMs, track = TRACK, followSeat = -1) {
   const focus = (view?.cars ?? []).find(c => c.seat === followSeat)
@@ -41,7 +41,7 @@ export function renderRace(ctx, W, H, view, nowMs, track = TRACK, followSeat = -
   drawVans(ctx, view, nowMs, true)
   drawLevel(true)
   ctx.restore()
-  renderOverlays(ctx, W, H, view)
+  renderOverlays(ctx, W, H, view, nowMs)
 }
 
 function drawGround(ctx, decor) {
@@ -364,7 +364,8 @@ function drawCar(ctx, view, track, car, nowMs) {
   ctx.strokeStyle = 'rgba(0,0,0,0.8)'
   ctx.lineWidth = 3
   const label = isLocal ? `YOU·P${car.place}` : `${(car.name || '').slice(0, 10)}·P${car.place}`
-  const labelText = car.finished ? `🏁 ${label}` : label
+  const crown = car.place === 1 && !car.finished ? '👑 ' : ''
+  const labelText = car.finished ? `🏁 ${label}` : `${crown}${label}`
   ctx.strokeText(labelText, 0, -28)
   ctx.fillText(labelText, 0, -28)
   if (car.item) {
@@ -409,6 +410,13 @@ function drawCar(ctx, view, track, car, nowMs) {
   ctx.fill()
   ctx.fillStyle = 'rgba(255,255,255,0.35)'
   ctx.fillRect(-10, -2, 7, 4)
+  if (car.shielding) {
+    ctx.strokeStyle = '#33ccff'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(0, 0, 24, 0, Math.PI * 2)
+    ctx.stroke()
+  }
   if (car.boosting) {
     ctx.fillStyle = Math.floor(nowMs / 60) % 2 ? '#33ccff' : '#ff9f1c'
     ctx.beginPath()
@@ -485,7 +493,7 @@ function drawPitBar(ctx, car) {
   ctx.restore()
 }
 
-function renderOverlays(ctx, W, H, view) {
+function renderOverlays(ctx, W, H, view, nowMs) {
   if (view?.phase === 'countdown' && view?.countdownEndsAt) {
     const remain = view.countdownEndsAt - Date.now()
     const label = remain > 2700 ? '3' : remain > 1800 ? '2' : remain > 900 ? '1' : 'GO!'
@@ -515,6 +523,13 @@ function renderOverlays(ctx, W, H, view) {
       const medal = ['🥇', '🥈', '🥉', '4.'][i]
       ctx.fillText(`${medal} ${(c.name || '').slice(0, 14)}`, W / 2, H * 0.52 + i * H * 0.055)
     })
+    const palette = ['#ff3355', '#ff9f1c', '#ffee33', '#44ff66', '#33ccff', '#c26bff']
+    for (let i = 0; i < 90; i += 1) {
+      const px = (i * 197.3 + nowMs * (0.05 + (i % 5) * 0.02)) % W
+      const py = (i * 311.7 + nowMs * (0.09 + (i % 7) * 0.015)) % H
+      ctx.fillStyle = palette[i % palette.length]
+      ctx.fillRect(px, py, 6, 4)
+    }
     ctx.restore()
   }
 }

@@ -7,6 +7,7 @@ export const CLIENT_MESSAGE_TYPES = Object.freeze({
   START: 'start',
   INPUT: 'input',
   USE_ITEM: 'use-item',
+  HORN: 'horn',
   PIT_PRESS: 'pit-press',
   VOTE_PRESET: 'vote-preset',
   VOTE_TRACK: 'vote-track',
@@ -42,6 +43,7 @@ const payloadValidators = {
     isNum(p.steer) && p.steer >= -1 && p.steer <= 1 &&
     isNum(p.throttle) && p.throttle >= -1 && p.throttle <= 1,
   [CLIENT_MESSAGE_TYPES.USE_ITEM]: () => true,
+  [CLIENT_MESSAGE_TYPES.HORN]: () => true,
   [CLIENT_MESSAGE_TYPES.PIT_PRESS]: () => true,
   [CLIENT_MESSAGE_TYPES.VOTE_PRESET]: p => ['balanced', 'drift', 'turbo'].includes(p.presetId),
   [CLIENT_MESSAGE_TYPES.VOTE_TRACK]: p => ['switchback', 'speedway', 'hairpin', 'esses'].includes(p.trackId),

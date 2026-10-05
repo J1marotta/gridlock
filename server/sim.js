@@ -14,14 +14,18 @@ export const SEAT_COLORS = [
   '#22dd88', '#33ccff', '#3366ff', '#c26bff',
   '#ff6bfb', '#ffffff', '#8a5a2b', '#9aa0a6',
 ]
-const ITEM_POOL = ['boost', 'oil']
+const ITEM_POOL = ['boost', 'oil', 'shield']
 const RANK_WEIGHTS = {
   boost: [2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 10, 10],
   oil: [10, 9, 8, 7, 6, 5, 4, 3, 3, 2, 2, 2],
+  shield: [3, 3, 4, 5, 6, 7, 8, 8, 8, 8, 8, 8],
 }
 
 const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v))
 const TAU = Math.PI * 2
+export function catchupMul(tune, place) {
+  return 1 + (tune.car.catchupPerPlace ?? 0) * Math.max(0, (place ?? 1) - 6)
+}
 export function angDiff(a, b) {
   let d = (b - a) % TAU
   if (d > Math.PI) d -= TAU
@@ -45,6 +49,7 @@ export function createRace(tune = cloneTune(), trackOverride = null) {
     boxes: track.boxes.map(() => 0),
     events: [],
     now: 0,
+    finalLapAnnounced: false,
   }
 }
 
@@ -67,7 +72,7 @@ export function addCar(race, { playerId, name, color, isNpc, seat }) {
     seg: info.seg, level: levelAt(race.track, info.seg),
     lap: 1, nextGate: 1, looped: false, progress: 0, place: seat + 1, // grid sits in gate 11; opening crossing must not count
     wear: 0, item: '', itemHeldMs: 0,
-    boostUntil: 0, spinUntil: 0, spinDir: 1,
+    boostUntil: 0, spinUntil: 0, spinDir: 1, shieldUntil: 0, lastHonk: -9999,
     pitState: 'none', pitHoldMs: 0, pitNeedleT: 0, pitWorkMs: 0, pitAutoAt: 0, pitGrade: '',
     pitArmed: true,
     finished: false, finishTimeMs: 0,
@@ -131,8 +136,17 @@ export function useItem(race, car) {
   const t = race.tune.items
   if (item === 'boost') car.boostUntil = race.now + t.boostMs
   else if (item === 'oil') dropHazard(race, car, 'oil')
+  else if (item === 'shield') car.shieldUntil = race.now + t.shieldMs
   else return false
   car.item = ''
+  return true
+}
+
+export function honk(race, car) {
+  if (!car || car.finished || race.phase !== 'racing') return false
+  if (race.now - car.lastHonk < 3000) return false
+  car.lastHonk = race.now
+  logEvent(race, 'horn', `📯 ${car.name} honks!`, car.seat)
   return true
 }
 
@@ -140,6 +154,12 @@ function hitHazard(race, car, hz) {
   const t = race.tune.items
   if (hz.owner === car.playerId) return
   if (hz.kind === 'oil') {
+    if (race.now < car.shieldUntil) {
+      car.shieldUntil = 0
+      hz.until = 0
+      logEvent(race, 'shield', `🛡 ${car.name}'s shield eats the oil!`, car.seat)
+      return
+    }
     car.spinUntil = race.now + t.oilSpinMs
     car.spinDir = Math.random() < 0.5 ? -1 : 1
     hz.until = 0
@@ -190,6 +210,7 @@ function stepCar(race, car, dt) {
   let top = BASE_TOP * topMul
   if (off) top *= tune.car.offTopMul
   if (now < car.boostUntil) top *= tune.items.boostTopMul
+  top *= catchupMul(tune, car.place)
 
   const dirx = Math.cos(car.angle), diry = Math.sin(car.angle)
   let vf = car.vx * dirx + car.vy * diry
@@ -442,6 +463,8 @@ export function aiItems(race, car) {
   if (!race.tune.items[car.item]) { car.item = ''; return }
   if (car.item === 'boost') {
     if (Math.hypot(car.vx, car.vy) > 200) useItem(race, car)
+  } else if (car.item === 'shield') {
+    if (race.now - car.itemHeldMs > 2000) useItem(race, car)
   } else if (car.item === 'oil' && race.now - car.itemHeldMs > 4000) {
     const behind = race.cars.some(o => o !== car && !o.finished &&
       Math.hypot(o.x - car.x, o.y - car.y) < 150 && o.progress < car.progress)
@@ -487,6 +510,12 @@ export function stepRace(race, dt, nowMs) {
     return b.progress - a.progress
   })
   ranked.forEach((c, i) => { c.place = i + 1 })
+
+  if (!race.finalLapAnnounced && ranked.some(c => !c.finished && c.lap >= race.tune.race.laps)) {
+    race.finalLapAnnounced = true
+    const leader = ranked[0]
+    logEvent(race, 'info', `🔔 FINAL LAP — ${leader?.name ?? 'P1'} leads!`, leader?.seat ?? -1)
+  }
 
   const winner = ranked.find(c => c.finished)
   if (winner && race.winnerSeat === -1) {

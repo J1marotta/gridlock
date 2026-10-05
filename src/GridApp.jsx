@@ -266,6 +266,19 @@ export default function GridApp() {
     if (started) audioRef.current.pit()
   }
 
+  function honkHorn() {
+    audioRef.current.ensure()
+    audioRef.current.horn()
+    if (mode === 'local') localRef.current?.honkHorn()
+    else try { transport.horn() } catch { /* noop */ }
+  }
+
+  function rematchKey() {
+    if (screen !== 'finished') return
+    if (mode === 'local') soloRematch()
+    else if (isHost()) try { transport.nextRace() } catch { /* noop */ }
+  }
+
   useEffect(() => {
     const racing = screen === 'countdown' || screen === 'racing'
     const down = e => {
@@ -275,6 +288,16 @@ export default function GridApp() {
         return
       }
       if (e.target.matches('input, textarea, select')) return
+      if (e.code === 'KeyH' && (racing || screen === 'finished')) {
+        e.preventDefault()
+        if (!e.repeat) honkHorn()
+        return
+      }
+      if (e.code === 'KeyR' && screen === 'finished') {
+        e.preventDefault()
+        if (!e.repeat) rematchKey()
+        return
+      }
       if (!racing) return
       const k = keysRef.current
       let handled = true
@@ -427,7 +450,7 @@ export default function GridApp() {
       <TopStrip
         view={view} chips={chips} mySeat={mySeat} muted={muted}
         onMute={() => { const m = !muted; setMuted(m); audioRef.current.ensure(); audioRef.current.setMuted(m) }}
-        onLeave={doLeave} onAdmin={() => setAdminOpen(o => !o)} onShare={() => setShareOpen(true)} inRoom={screen !== 'menu'}
+        onLeave={doLeave} onAdmin={() => setAdminOpen(o => !o)} onShare={() => setShareOpen(true)} onHorn={honkHorn} inRoom={screen !== 'menu'}
       />
       <div className="grid-layout">
         {error && <div className="grid-card grid-err">⚠ {error}</div>}
@@ -455,17 +478,17 @@ export default function GridApp() {
                 </label>
               </div>
               <p className="dim small">
-                ↑ gas · ↓ brake · ← → steer · Space item · P pit · <kbd>~</kbd> live tune panel.
+                ↑ gas · ↓ brake · ← → steer · Space item · P pit · H horn · R rematch · <kbd>~</kbd> live tune panel.
                 Tires wear — the pit crew runs out when you box. Endpoint: {getColyseusEndpoint()}
               </p>
             </div>
             <div className="grid-card">
               <h2>HOUSE RULES</h2>
               <ul className="rules">
-                <li>🎁 Item boxes respawn — hold one item, odds favor the back</li>
+                <li>🎁 Item boxes respawn — 🚀 boost, 🛢 oil, 🛡 shield. Odds favor the back</li>
                 <li>🚐 Traffic vans cruise the line. Tag one, lose speed</li>
                 <li>🔧 Bald tires (red dot) halve your top speed — box for fresh rubber</li>
-                <li>⏱ 3 laps, bots fill the 12-car grid</li>
+                <li>⏱ 2 laps, bots fill the 12-car grid · H to honk</li>
               </ul>
             </div>
           </div>
@@ -488,7 +511,14 @@ export default function GridApp() {
               <button className="nitro-btn" onClick={() => transport.setReady(!(view.players.find(p => p.id === privateState?.playerId)?.ready))}>
                 {view.players.find(p => p.id === privateState?.playerId)?.ready ? 'UNREADY' : 'READY UP'}
               </button>
-              {isHost() && <button className="nitro-btn go" onClick={() => transport.start()}>START RACE</button>}
+              {isHost() && (
+                <button
+                  className="nitro-btn go"
+                  style={view.players.length > 0 && view.players.every(p => p.ready) ? { borderColor: '#22ff66', boxShadow: '0 0 12px #22ff66' } : undefined}
+                  onClick={() => transport.start()}
+                >{view.players.length > 0 && view.players.every(p => p.ready) ? 'START RACE ✓' : 'START RACE'}</button>
+              )}
+              <button className="nitro-btn" onClick={() => { try { navigator.clipboard?.writeText(view.roomCode) } catch { /* noop */ } }}>⧉ CODE</button>
               <button className="nitro-btn" onClick={() => setAdminOpen(true)}>🔧 TUNE (host)</button>
             </div>
             {mode === 'net' && isHost() && (
@@ -561,10 +591,10 @@ export default function GridApp() {
                 </table>
                 <div className="nitro-row" style={{ marginTop: 8 }}>
                   {mode === 'local' ? (
-                    <button className="nitro-btn go" onClick={soloRematch}>REMATCH →</button>
+                    <button className="nitro-btn go" onClick={soloRematch}>REMATCH (R) →</button>
                   ) : isHost() ? (
-                    <button className="nitro-btn go" onClick={() => transport.nextRace()}>APPLY VOTES & NEXT RACE →</button>
-                  ) : <span className="dim">Waiting for host…</span>}
+                    <button className="nitro-btn go" onClick={() => transport.nextRace()}>APPLY VOTES & NEXT RACE (R) →</button>
+                  ) : <span className="dim">Waiting for host… (H to honk)</span>}
                 </div>
               </div>
             )}
@@ -664,7 +694,14 @@ function TrackVote({ currentTrackId, raceNo, votes = {}, playerId, onVote }) {
   </section>
 }
 
-function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, onShare, inRoom }) {
+function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, onShare, onHorn, inRoom }) {
+  const lead = chips.length ? Math.max(...chips.map(c => c.progress ?? 0)) : 0
+  const gapOf = c => {
+    if (!chips.length || c.place === 1) return ''
+    const d = lead - (c.progress ?? 0)
+    if (!(d > 0)) return ''
+    return `+${(d / 340).toFixed(1)}s`
+  }
   return (
     <div className="topstrip">
       <div className="logo">GRIDLOCK</div>
@@ -673,9 +710,9 @@ function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, onShar
           <div key={c.seat} className={`chip ${c.seat === mySeat ? 'me' : ''} ${c.seat === chips[0]?.seat && chips.length ? 'leader' : ''}`}>
             <span className="chip-pos">P{c.place || '–'}</span>
             <span className="dot" style={{ background: SEAT_COLORS[(c.colorIndex ?? c.seat) % SEAT_COLORS.length] }} />
-            <span className="chip-name">{c.seat === mySeat ? 'YOU' : (c.name || '').slice(0, 10)}</span>
-            <span className="chip-lap">LAP {c.lap ?? '–'}/{view?.laps ?? 3}</span>
-            <span className="chip-item" title={c.item ? ITEM_LABEL[c.item] : ''}>{c.item ? (ITEM_GLYPH[c.item] ?? '?') : ''}</span>
+            <span className="chip-name">{c.place === 1 && chips.length ? '👑 ' : ''}{c.seat === mySeat ? 'YOU' : (c.name || '').slice(0, 10)}</span>
+            <span className="chip-lap">LAP {c.lap ?? '–'}/{view?.laps ?? 2}{gapOf(c) ? ` ${gapOf(c)}` : ''}</span>
+            <span className="chip-item" title={c.item ? ITEM_LABEL[c.item] : ''}>{c.item ? (ITEM_GLYPH[c.item] ?? '?') : ''}{c.shielding ? '🛡' : ''}</span>
             <span className={`tire ${(c.wear ?? 0) >= 100 ? 'bald' : (c.wear ?? 0) >= 70 ? 'worn' : ''}`} title="tire life">●{Math.max(0, 100 - Math.round(c.wear ?? 0))}%{c.seat === mySeat && (c.wear ?? 0) >= 100 ? ' PIT!' : ''}</span>
             {c.pit !== 'none' && c.pit ? <span>🔧</span> : null}
           </div>
@@ -684,6 +721,7 @@ function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, onShar
       <div className="nitro-row">
         {view && <span className="roompill">ROOM {view.roomCode}{view.raceNo > 1 ? ` · R${view.raceNo}` : ''}</span>}
         {view && <button className="nitro-btn small" onClick={onShare} title="Share room invite">↗ INVITE</button>}
+        {inRoom && <button className="nitro-btn small" onClick={onHorn} title="Honk (H)">📯</button>}
         {inRoom && <button className="nitro-btn small" onClick={onAdmin} title="Live tune (~)">🔧</button>}
         <button className="nitro-btn small" onClick={onMute}>{muted ? '🔇' : '🔊'}</button>
         {inRoom && <button className="nitro-btn small" onClick={onLeave}>LEAVE</button>}

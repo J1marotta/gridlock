@@ -117,6 +117,7 @@ export class ColyseusTransport {
   start() { this.command(CLIENT_MESSAGE_TYPES.START) }
   drive(steer, throttle) { this.command(CLIENT_MESSAGE_TYPES.INPUT, { steer, throttle }) }
   useItem() { this.command(CLIENT_MESSAGE_TYPES.USE_ITEM) }
+  horn() { this.command(CLIENT_MESSAGE_TYPES.HORN) }
   pitPress() { this.command(CLIENT_MESSAGE_TYPES.PIT_PRESS) }
   votePreset(presetId) { this.command(CLIENT_MESSAGE_TYPES.VOTE_PRESET, { presetId }) }
   voteTrack(trackId) { this.command(CLIENT_MESSAGE_TYPES.VOTE_TRACK, { trackId }) }

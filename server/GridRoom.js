@@ -10,7 +10,7 @@ import {
 import { applyPatch, applyRacePreset, cloneTune, RACE_PRESETS } from '../src/game/tune.js'
 import { DEFAULT_TRACK_ID, getTrack, getTrackData, getTrackVoteOptions, TRACKS } from '../src/game/tracks.js'
 import { trackFromData } from '../src/game/track.js'
-import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from './sim.js'
+import { SEAT_COLORS, addCar, createRace, honk, pressPit, startCountdown, stepRace, useItem } from './sim.js'
 import { BoxState, CarState, FeedEvent, GridState, HazardState, PlayerState, VanState } from './schema.js'
 import { SERVER_TICK_MS } from './sim.js'
 
@@ -124,6 +124,7 @@ export class GridRoom extends Room {
     else if (msg.type === CLIENT_MESSAGE_TYPES.START) result = this.startRace(player)
     else if (msg.type === CLIENT_MESSAGE_TYPES.INPUT) result = this.drive(player, P)
     else if (msg.type === CLIENT_MESSAGE_TYPES.USE_ITEM) result = this.useItem(player)
+    else if (msg.type === CLIENT_MESSAGE_TYPES.HORN) result = this.horn(player)
     else if (msg.type === CLIENT_MESSAGE_TYPES.PIT_PRESS) result = this.pitPress(player)
     else if (msg.type === CLIENT_MESSAGE_TYPES.VOTE_PRESET) result = this.votePreset(player, P.presetId)
     else if (msg.type === CLIENT_MESSAGE_TYPES.VOTE_TRACK) result = this.voteTrack(player, P.trackId)
@@ -204,6 +205,12 @@ export class GridRoom extends Room {
     const car = this.carOf(player.id)
     if (!car || this.state.phase !== 'racing') return { ok: false, error: 'wrong-phase', message: 'Not racing' }
     return useItem(this.race, car) ? { ok: true } : { ok: false, error: 'no-item', message: 'No item held' }
+  }
+
+  horn(player) {
+    const car = this.carOf(player.id)
+    if (!car || this.state.phase !== 'racing') return { ok: false, error: 'wrong-phase', message: 'Not racing' }
+    return honk(this.race, car) ? { ok: true } : { ok: false, error: 'cooldown', message: 'Horn is cooling down' }
   }
 
   pitPress(player) {
@@ -339,12 +346,14 @@ export class GridRoom extends Room {
       s.level = car.level ?? 0
       s.lap = Math.min(car.lap, this.tune.race.laps)
       s.place = car.place
+      s.progress = Math.round(car.progress)
       s.item = car.item
       s.wear = Math.round(Math.min(100, car.wear))
       s.pit = car.pitState
       s.needle = car.pitState === 'crew' ? ((car.pitNeedleT % 1 + 1) % 1) : 0
       s.boosting = nowMs < car.boostUntil
       s.spinning = nowMs < car.spinUntil
+      s.shielding = nowMs < car.shieldUntil
       s.finished = car.finished
     }
     const hzIds = new Set()

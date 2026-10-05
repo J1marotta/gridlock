@@ -1,5 +1,5 @@
 // Solo mode: the authoritative sim running locally.
-import { SEAT_COLORS, addCar, createRace, pressPit, startCountdown, stepRace, useItem } from '../../server/sim.js'
+import { SEAT_COLORS, addCar, createRace, honk, pressPit, startCountdown, stepRace, useItem } from '../../server/sim.js'
 import { trackFromData } from './track.js'
 import { DEFAULT_TRACK_ID, getTrackData } from './tracks.js'
 import { cloneTune } from './tune.js'
@@ -47,6 +47,10 @@ export class LocalRace {
     return pressPit(this.race, car)
   }
 
+  honkHorn() {
+    return honk(this.race, this.race.cars[0])
+  }
+
   tick(nowMs = Date.now(), dtMs = 50) {
     stepRace(this.race, dtMs / 1000, nowMs)
   }
@@ -68,12 +72,12 @@ export class LocalRace {
       cars: r.cars.map(c => ({
         seat: c.seat, playerId: c.playerId, name: c.playerName, colorIndex: SEAT_COLORS.indexOf(c.color),
         isNpc: c.isNpc, x: c.x, y: c.y, angle: c.angle, speed: Math.hypot(c.vx, c.vy),
-        lap: Math.min(c.lap, this.tune.race.laps), place: c.place, item: c.item,
+        lap: Math.min(c.lap, this.tune.race.laps), place: c.place, progress: Math.round(c.progress), item: c.item,
         level: c.level ?? 0,
         wear: Math.round(Math.min(100, c.wear)), pit: c.pitState,
         needle: c.pitState === 'crew' ? ((c.pitNeedleT % 1 + 1) % 1) : 0,
         boosting: now < c.boostUntil,
-        spinning: now < c.spinUntil, finished: c.finished,
+        spinning: now < c.spinUntil, shielding: now < c.shieldUntil, finished: c.finished,
       })),
       hazards: r.hazards.map(h => ({ id: h.id, kind: h.kind, x: h.x, y: h.y })),
       vans: r.vans.map(v => ({ id: v.id, x: v.x, y: v.y, angle: v.angle, level: v.level ?? 0, wobbling: now < v.wobbleUntil })),
