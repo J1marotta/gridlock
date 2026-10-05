@@ -379,6 +379,12 @@ function drawCar(ctx, view, track, car, nowMs) {
   ctx.fillStyle = '#1a1a22'
   ctx.fillRect(-19, -11, 5, 22)
   ctx.globalAlpha = isLocal ? 1 : 0.72
+  ctx.fillStyle = '#0b0b10'
+  for (const [wx, wy] of [[9, -10.5], [9, 10.5], [-9, -10.5], [-9, 10.5]]) {
+    ctx.beginPath()
+    ctx.roundRect(wx - 4.5, wy - 2.5, 9, 5, 2)
+    ctx.fill()
+  }
   ctx.fillStyle = color
   ctx.beginPath()
   ctx.roundRect(-15, -10, 31, 20, 5)
@@ -392,6 +398,10 @@ function drawCar(ctx, view, track, car, nowMs) {
   ctx.strokeStyle = isLocal ? '#fff' : '#101018'
   ctx.lineWidth = isLocal ? 4 : 2.5
   ctx.stroke()
+  ctx.globalAlpha = isLocal ? 1 : 0.72
+  const lightBody = color === '#ffffff' || color === '#9aa0a6' || color === '#ffee33'
+  ctx.fillStyle = lightBody ? '#101018' : 'rgba(255,255,255,0.9)'
+  ctx.fillRect(-15, -1.5, 39, 3)
   ctx.fillStyle = color
   ctx.globalAlpha = isLocal ? 1 : 0.72
   ctx.beginPath()
@@ -401,15 +411,27 @@ function drawCar(ctx, view, track, car, nowMs) {
   ctx.strokeStyle = 'rgba(0,0,0,0.5)'
   ctx.lineWidth = 1.5
   ctx.stroke()
-  ctx.fillStyle = 'rgba(10,14,24,0.9)'
-  ctx.fillRect(0, -6, 8, 12)
-  ctx.fillStyle = '#fff9c4'
+  ctx.fillStyle = 'rgba(20,20,28,0.95)'
+  ctx.fillRect(-3, -5.5, 9, 11)
+  ctx.fillStyle = 'rgba(159,216,255,0.95)'
+  ctx.fillRect(6, -5, 3, 10)
+  ctx.fillStyle = 'rgba(90,140,190,0.9)'
+  ctx.fillRect(-6, -4.5, 2.5, 9)
+  ctx.save()
+  ctx.shadowColor = '#fffde7'
+  ctx.shadowBlur = 8
+  ctx.fillStyle = '#fffde7'
   ctx.beginPath()
-  ctx.arc(13, -6, 2.4, 0, Math.PI * 2)
-  ctx.arc(13, 6, 2.4, 0, Math.PI * 2)
+  ctx.arc(16.5, -5, 2.6, 0, Math.PI * 2)
+  ctx.arc(16.5, 5, 2.6, 0, Math.PI * 2)
   ctx.fill()
-  ctx.fillStyle = 'rgba(255,255,255,0.35)'
-  ctx.fillRect(-10, -2, 7, 4)
+  ctx.restore()
+  ctx.save()
+  ctx.shadowColor = '#ff2222'
+  ctx.shadowBlur = 6
+  ctx.fillStyle = '#ff2222'
+  ctx.fillRect(-16.5, -7, 2.5, 14)
+  ctx.restore()
   if (car.shielding) {
     ctx.strokeStyle = '#33ccff'
     ctx.lineWidth = 3
