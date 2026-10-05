@@ -10,7 +10,7 @@ describe('track library', () => {
   })
 
   it('every premade validates and has the full kit', () => {
-    expect(TRACKS.length).toBe(4)
+    expect(TRACKS.length).toBe(5)
     for (const t of TRACKS) {
       const res = trackFromData(t.data)
       expect(res.ok, t.id).toBe(true)
@@ -67,7 +67,7 @@ describe('every premade hosts a full AI race', () => {
         const ai = aiInput(race.race, me())
         race.setInput(ai.steer, ai.throttle)
         aiItems(race.race, me())
-        if (me().pitState === 'crew') race.pressSpace()
+        race.pitPress()
         race.tick(now, 50)
       }
       expect(race.race.phase).toBe('finished')

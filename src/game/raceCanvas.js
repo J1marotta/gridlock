@@ -485,7 +485,7 @@ function drawCar(ctx, view, track, car, nowMs) {
     ctx.fillText((car.wear ?? 0) >= 100 ? '🔧 PIT NOW!' : '🔧 TIRES — PIT SOON', car.x, car.y - 52)
     ctx.restore()
   }
-  if ((car.pit === 'crew' || car.pit === 'working') && isLocal) {
+  if (car.pit === 'working' && isLocal) {
     drawPitBar(ctx, car)
   }
 }
@@ -499,19 +499,12 @@ function drawPitBar(ctx, car) {
   ctx.strokeStyle = '#fff'
   ctx.lineWidth = 2
   ctx.strokeRect(x - 2, y - 2, w + 4, h + 22)
-  const zone = car.pitZone ?? { perfectHalf: 0.06, okHalf: 0.18 }
-  ctx.fillStyle = 'rgba(255,255,255,0.25)'
-  ctx.fillRect(x, y, w, h)
   ctx.fillStyle = 'rgba(34,255,102,0.5)'
-  const pw = w * zone.perfectHalf * 2
-  ctx.fillRect(x + w / 2 - pw / 2, y, pw, h)
-  const nx = x + w * (car.needle ?? 0.5)
-  ctx.fillStyle = '#ffd23f'
-  ctx.fillRect(nx - 2, y - 3, 4, h + 6)
+  ctx.fillRect(x, y, w, h)
   ctx.fillStyle = '#fff'
   ctx.font = 'bold 11px monospace'
   ctx.textAlign = 'center'
-  ctx.fillText(car.pit === 'crew' ? 'SPACE IN THE GREEN!' : 'CREW WORKING…', car.x, y + h + 15)
+  ctx.fillText('CREW WORKING…', car.x, y + h + 15)
   ctx.restore()
 }
 

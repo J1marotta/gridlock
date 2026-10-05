@@ -44,15 +44,33 @@ function switchbackPoints() {
   ]
 }
 
-function premade(id, name, blurb, points) {
-  const source = id === 'switchback' ? smoothClosed(points, 2) : points
-  const res = prepareData(source, { name })
+// Monza homage: flat-out start straight, T1 + Roggia chicanes, Curva
+// Grande sweeper, two Lesmos, Ascari, and the long Parabolica onto the
+// straight. Sparse control points — smoothed like switchback.
+function monzaPoints() {
+  return [
+    [860, 736], [1100, 736], [1300, 730],
+    [1400, 748], [1460, 720], [1468, 662],
+    [1435, 600], [1355, 525], [1255, 468], [1150, 430],
+    [1060, 412], [1015, 425], [970, 408],
+    [880, 400], [795, 392], [730, 398], [655, 390],
+    [610, 420], [622, 540], [598, 588], [608, 638],
+    [645, 685], [720, 715],
+  ]
+}
+
+function premade(id, name, blurb, points, smooth = false, pit = null) {
+  const source = smooth ? smoothClosed(points, 2) : points
+  const res = prepareData(source, { name, pit })
   if (!res.ok) throw new Error(`Premade ${id} failed: ${res.errors.join('; ')}`)
   return { id, name, blurb, data: res.data, warnings: res.warnings }
 }
 
+const MONZA_PIT = { cx: 650, cy: 838, angle: 0, length: 750, width: 96 }
+
 export const TRACKS = [
-  premade('switchback', 'Switchback Park', 'Fast front straight, a tight hairpin and a flowing chicane.', switchbackPoints()),
+  premade('switchback', 'Switchback Park', 'Fast front straight, a tight hairpin and a flowing chicane.', switchbackPoints(), true),
+  premade('monza', 'Monza', 'Flat-out straights, T1 and Roggia chicanes, Curva Grande, Lesmos, Ascari, Parabolica.', monzaPoints(), true, MONZA_PIT),
   premade('speedway', 'Speedway', 'Big circle. Flat out, close packs, pits decide it.', circlePoints(800, 450, 390)),
   premade('hairpin', 'Hairpin Alley', 'Stadium straights, brutal hairpins both ends.', roundedRectPoints(800, 450, 1050, 430, 70)),
   premade('esses', 'The Esses', 'Kidney loop — curvature never sits still.', kidneyPoints(800, 450, 335, 0.16, 0.6)),

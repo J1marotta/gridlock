@@ -122,7 +122,7 @@ describe('studio geometry', () => {
       const ai = aiInput(race.race, me())
       race.setInput(ai.steer, ai.throttle)
       aiItems(race.race, me())
-      if (me().pitState === 'crew') race.pressSpace()
+      race.pitPress()
       race.tick(now, 50)
     }
     expect(race.race.phase).toBe('finished')

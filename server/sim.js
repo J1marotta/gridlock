@@ -313,7 +313,7 @@ function stepCar(race, car, dt) {
         car.pitState = 'crew'
         car.pitNeedleT = Math.random()
         car.pitAutoAt = race.now + 5000
-        logEvent(race, 'pit', `🔧 Crew on ${car.name} — hit SPACE in the zone!`, car.seat)
+        logEvent(race, 'pit', `🔧 Crew on ${car.name} — boxing for fresh tyres`, car.seat)
       }
     } else {
       car.pitHoldMs = 0
