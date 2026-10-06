@@ -8,25 +8,31 @@
   padding: 6px 10px;
 }
 .logo { font-weight: 900; letter-spacing: 2px; color: #44ff66; text-shadow: 2px 2px 0 #0a4d1e; white-space: nowrap; }
-.chips-row { display: flex; gap: 5px; flex: 1; overflow-x: auto; padding: 2px; }
-.chip {
-  display: flex; align-items: center; gap: 7px; white-space: nowrap;
-  background: #0a0a12; border: 2px solid #2c2c44; border-radius: 8px;
-  padding: 5px 11px; font-size: 14px; font-weight: 700;
-}
-.chip.me { border-color: #fff; }
-.chip.leader { border-color: #ffd23f; }
-.chip .dot { width: 14px; height: 14px; border-radius: 4px; display: inline-block; }
-.chip-pos { color: #ffd23f; font-weight: 900; min-width: 30px; }
-.chip-name { max-width: 110px; overflow: hidden; text-overflow: ellipsis; }
-.chip-lap { color: #9be9ff; white-space: nowrap; }
-.chip-item { min-width: 22px; text-align: center; font-size: 16px; }
+.topstrip > .nitro-row { margin-left: auto; }
+.roompill { background: #14141c; border: 2px solid #33ccff; border-radius: 8px; padding: 4px 10px; font-weight: 700; font-size: 12px; white-space: nowrap; }
 .tire { font-size: 13px; font-weight: 800; }
 .tire { color: #22ff66; }
 .tire.worn { color: #ffd23f; }
 .tire.bald { color: #ff3333; animation: blink 0.8s steps(2) infinite; }
 @keyframes blink { 50% { opacity: 0.3; } }
-.roompill { background: #14141c; border: 2px solid #33ccff; border-radius: 8px; padding: 4px 10px; font-weight: 700; font-size: 12px; white-space: nowrap; }
+
+/* ---- in-game HUD: F1-style tower + Mario-Kart position badge ---- */
+.race-hud-tower {
+  position: absolute; z-index: 3; top: 8px; left: 8px;
+  display: grid; gap: 1px; padding: 5px 7px;
+  background: rgba(5, 5, 12, 0.72); border: 1px solid rgba(255, 255, 255, 0.25); border-radius: 8px;
+  font-size: 12px; font-weight: 700; pointer-events: none;
+}
+.hud-row { display: flex; align-items: center; gap: 6px; white-space: nowrap; color: #cfe9ff; }
+.hud-row.me { color: #fff; background: rgba(68, 255, 102, 0.15); border-radius: 4px; }
+.hud-pos { color: #ffd23f; font-weight: 900; min-width: 22px; }
+.hud-row .dot { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+.hud-name { max-width: 90px; overflow: hidden; text-overflow: ellipsis; }
+.hud-gap { color: #9be9ff; margin-left: auto; font-variant-numeric: tabular-nums; }
+.hud-item { min-width: 18px; text-align: center; }
+.hud-badge { position: absolute; z-index: 3; right: 10px; bottom: 8px; text-align: right; pointer-events: none; text-shadow: 2px 2px 0 #000; }
+.hud-big { display: block; font-size: 44px; font-weight: 900; color: #fff; line-height: 1; }
+.hud-sub { font-size: 14px; font-weight: 800; color: #ffd23f; }
 
 /* ---- layout/cards (shared vocabulary with nitro) ---- */
 .grid-layout { max-width: 1380px; margin: 0 auto; display: grid; gap: 10px; }
@@ -108,11 +114,11 @@
   .grid-shell { min-height: 100dvh; padding: max(5px, env(safe-area-inset-top)) max(5px, env(safe-area-inset-right)) max(6px, env(safe-area-inset-bottom)) max(5px, env(safe-area-inset-left)); }
   .topstrip { gap: 6px; padding: 5px; flex-wrap: wrap; }
   .logo { font-size: 12px; letter-spacing: 1px; }
-  .chips-row { order: 3; flex-basis: 100%; }
-  .chip { padding: 4px 6px; font-size: 11px; gap: 4px; }
-  .chip-name { max-width: 54px; }
-  .chip-lap { display: none; }
   .tire { font-size: 11px; }
+  .race-hud-tower { font-size: 10px; top: 5px; left: 5px; padding: 4px 5px; }
+  .hud-name { max-width: 56px; }
+  .hud-big { font-size: 30px; }
+  .hud-sub { font-size: 11px; }
   .topstrip > .nitro-row { margin-left: auto; }
   .road-wrap { width: 100%; height: auto; aspect-ratio: 1.25; border-width: 2px; }
   .road-wrap canvas { width: 100%; height: 100%; }
@@ -136,8 +142,6 @@
 @media (orientation: landscape) and (max-height: 520px) and (pointer: coarse) {
   .grid-shell { padding: 2px; }
   .topstrip { margin-bottom: 2px; padding: 2px 5px; }
-  .chips-row { order: initial; flex-basis: auto; }
-  .chip { font-size: 10px; padding: 2px 4px; }
   .grid-layout { gap: 3px; }
   .road-wrap { width: min(100%, calc(100dvh * 1.75)); aspect-ratio: 1.75; }
   .race-screen { gap: 2px; }

@@ -561,7 +561,7 @@ export function pressPit(race, car) {
   car.pitHoldMs = 0
   car.vx = 0
   car.vy = 0
-  logEvent(race, 'pit', `🔧 ${car.name} pits for fresh tyres — mash P!`, car.seat)
+  logEvent(race, 'pit', `🔧 ${car.name} pits for fresh tyres — mash Z!`, car.seat)
   return true
 }
 

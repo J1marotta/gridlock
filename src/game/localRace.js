@@ -77,6 +77,7 @@ export class LocalRace {
         wear: Math.round(Math.min(100, c.wear)), pit: c.pitState,
         needle: c.pitState === 'crew' ? ((c.pitNeedleT % 1 + 1) % 1) : 0,
         pitProgress: pitProgressOf(c),
+        pitPushes: c.pitPushes ?? 0,
         boosting: now < c.boostUntil,
         spinning: now < c.spinUntil, shielding: now < c.shieldUntil, finished: c.finished,
         hb: Boolean(c.input.handbrake),

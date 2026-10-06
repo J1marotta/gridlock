@@ -511,17 +511,27 @@ function drawCar(ctx, view, track, car, nowMs) {
   }
 }
 
+let lastPitPushes = 0
+let keyDepressedUntil = 0
+
 function drawPitBar(ctx, car, nowMs) {
   const w = 170, h = 16
   const x = car.x - w / 2, y = car.y - 70
   const p = Math.min(1, Math.max(0, car.pitProgress ?? 0))
+  const pushes = car.pitPushes ?? 0
+  if (pushes < lastPitPushes) lastPitPushes = pushes
+  if (pushes > lastPitPushes) {
+    lastPitPushes = pushes
+    keyDepressedUntil = nowMs + 160
+  }
+  const depressed = nowMs < keyDepressedUntil
   const pulse = 0.7 + 0.3 * Math.sin(nowMs / 180)
   ctx.save()
   ctx.fillStyle = 'rgba(5,5,12,0.85)'
-  ctx.fillRect(x - 3, y - 3, w + 6, h + 26)
+  ctx.fillRect(x - 3, y - 3, w + 6, h + 66)
   ctx.strokeStyle = '#ffd23f'
   ctx.lineWidth = 2
-  ctx.strokeRect(x - 3, y - 3, w + 6, h + 26)
+  ctx.strokeRect(x - 3, y - 3, w + 6, h + 66)
   ctx.fillStyle = 'rgba(255,255,255,0.18)'
   ctx.fillRect(x, y, w, h)
   ctx.fillStyle = p >= 1 ? '#22ff66' : '#33ccff'
@@ -530,7 +540,21 @@ function drawPitBar(ctx, car, nowMs) {
   ctx.font = 'bold 12px monospace'
   ctx.textAlign = 'center'
   ctx.globalAlpha = pulse
-  ctx.fillText(`🔧 MASH P! ${Math.round(p * 100)}%`, car.x, y + h + 17)
+  ctx.fillText(`🔧 MASH ${Math.round(p * 100)}%`, car.x, y + h + 17)
+  ctx.globalAlpha = 1
+  // on-screen keycap that bottoms out with every mash
+  const kw = 46, kh = 32
+  const kx = car.x - kw / 2, ky = y + h + 24 + (depressed ? 4 : 0)
+  ctx.fillStyle = depressed ? '#44ff66' : '#23232e'
+  ctx.strokeStyle = '#fff'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.roundRect(kx, ky, kw, kh, 7)
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = depressed ? '#06130a' : '#fff'
+  ctx.font = '900 20px monospace'
+  ctx.fillText('Z', car.x, ky + 24)
   ctx.restore()
 }
 

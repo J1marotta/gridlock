@@ -307,7 +307,7 @@ export default function GridApp() {
       else if (e.code === 'ArrowLeft' || e.code === 'KeyA') k.left = true
       else if (e.code === 'ArrowRight' || e.code === 'KeyD') k.right = true
       else if (e.code === 'Space') { if (!e.repeat) pressSpace() }
-      else if (e.code === 'KeyP') { pressPit() }
+      else if (e.code === 'KeyZ') { pressPit() }
       else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { k.hb = true }
       else handled = false
       if (handled) {
@@ -451,7 +451,7 @@ export default function GridApp() {
   return (
     <div className="grid-shell">
       <TopStrip
-        view={view} chips={chips} mySeat={mySeat} muted={muted}
+        view={view} muted={muted}
         onMute={() => { const m = !muted; setMuted(m); audioRef.current.ensure(); audioRef.current.setMuted(m) }}
         onLeave={doLeave} onAdmin={() => setAdminOpen(o => !o)} onShare={() => setShareOpen(true)} onHorn={honkHorn} inRoom={screen !== 'menu'}
       />
@@ -481,7 +481,7 @@ export default function GridApp() {
                 </label>
               </div>
               <p className="dim small">
-                ↑ gas · ↓ brake · ← → steer · Space item · P pit (mash!) · Shift handbrake · H horn · R rematch · <kbd>~</kbd> live tune panel.
+                ↑ gas · ↓ brake · ← → steer · Space item · Z pit (mash!) · Shift handbrake · H horn · R rematch · <kbd>~</kbd> live tune panel.
                 Tires wear — the pit crew runs out when you box. Endpoint: {getColyseusEndpoint()}
               </p>
             </div>
@@ -698,30 +698,10 @@ function TrackVote({ currentTrackId, raceNo, votes = {}, playerId, onVote }) {
   </section>
 }
 
-function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, onShare, onHorn, inRoom }) {
-  const lead = chips.length ? Math.max(...chips.map(c => c.progress ?? 0)) : 0
-  const gapOf = c => {
-    if (!chips.length || c.place === 1) return ''
-    const d = lead - (c.progress ?? 0)
-    if (!(d > 0)) return ''
-    return `+${(d / 340).toFixed(1)}s`
-  }
+function TopStrip({ view, muted, onMute, onLeave, onAdmin, onShare, onHorn, inRoom }) {
   return (
     <div className="topstrip">
       <div className="logo">GRIDLOCK</div>
-      <div className="chips-row">
-        {(chips.length ? chips : [{ seat: -1, name: '—', place: 0 }]).slice(0, 12).map(c => (
-          <div key={c.seat} className={`chip ${c.seat === mySeat ? 'me' : ''} ${c.seat === chips[0]?.seat && chips.length ? 'leader' : ''}`}>
-            <span className="chip-pos">P{c.place || '–'}</span>
-            <span className="dot" style={{ background: SEAT_COLORS[(c.colorIndex ?? c.seat) % SEAT_COLORS.length] }} />
-            <span className="chip-name">{c.place === 1 && chips.length ? '👑 ' : ''}{c.seat === mySeat ? 'YOU' : (c.name || '').slice(0, 10)}</span>
-            <span className="chip-lap">LAP {c.lap ?? '–'}/{view?.laps ?? 2}{gapOf(c) ? ` ${gapOf(c)}` : ''}</span>
-            <span className="chip-item" title={c.item ? ITEM_LABEL[c.item] : ''}>{c.item ? (ITEM_GLYPH[c.item] ?? '?') : ''}{c.shielding ? '🛡' : ''}</span>
-            <span className={`tire ${(c.wear ?? 0) >= 100 ? 'bald' : (c.wear ?? 0) >= 70 ? 'worn' : ''}`} title="tire life">●{Math.max(0, 100 - Math.round(c.wear ?? 0))}%{c.seat === mySeat && (c.wear ?? 0) >= 100 ? ' PIT!' : ''}</span>
-            {c.pit !== 'none' && c.pit ? <span>🔧</span> : null}
-          </div>
-        ))}
-      </div>
       <div className="nitro-row">
         {view && <span className="roompill">ROOM {view.roomCode}{view.raceNo > 1 ? ` · R${view.raceNo}` : ''}</span>}
         {view && <button className="nitro-btn small" onClick={onShare} title="Share room invite">↗ INVITE</button>}
@@ -732,6 +712,37 @@ function TopStrip({ view, chips, mySeat, muted, onMute, onLeave, onAdmin, onShar
       </div>
     </div>
   )
+}
+
+function RaceHud({ view, mySeat }) {
+  const cars = [...(view?.cars ?? [])].sort((a, b) => (a.place || 99) - (b.place || 99))
+  if (!cars.length) return null
+  const lead = Math.max(...cars.map(c => c.progress ?? 0))
+  const gapOf = c => {
+    if (c.place === 1) return 'LEADER'
+    const d = lead - (c.progress ?? 0)
+    return d > 0 ? `+${(d / 340).toFixed(1)}` : ''
+  }
+  const me = cars.find(c => c.seat === mySeat)
+  return (<>
+    <div className="race-hud-tower" aria-label="Standings">
+      {cars.map(c => (
+        <div key={c.seat} className={`hud-row ${c.seat === mySeat ? 'me' : ''}`}>
+          <span className="hud-pos">P{c.place || '–'}</span>
+          <span className="dot" style={{ background: SEAT_COLORS[(c.colorIndex ?? c.seat) % SEAT_COLORS.length] }} />
+          <span className="hud-name">{c.seat === mySeat ? 'YOU' : (c.name || '').slice(0, 10)}</span>
+          <span className="hud-gap">{gapOf(c)}</span>
+          <span className="hud-item" title={c.item ? ITEM_LABEL[c.item] : ''}>{c.item ? (ITEM_GLYPH[c.item] ?? '?') : ''}{c.shielding ? '🛡' : ''}</span>
+          <span className={`tire ${(c.wear ?? 0) >= 100 ? 'bald' : (c.wear ?? 0) >= 70 ? 'worn' : ''}`} title="tire life">●</span>
+          {c.pit !== 'none' && c.pit ? <span>🔧</span> : null}
+        </div>
+      ))}
+    </div>
+    <div className="hud-badge" aria-label="Your position">
+      <span className="hud-big">P{me?.place ?? '–'}</span>
+      <span className="hud-sub">LAP {me?.lap ?? '–'}/{view?.laps ?? 2}</span>
+    </div>
+  </>)
 }
 
 function RaceCanvas({ view, audio, mySeat, track, mobilePlay }) {
@@ -769,6 +780,7 @@ function RaceCanvas({ view, audio, mySeat, track, mobilePlay }) {
     <div className="road-wrap scanlines">
       <canvas ref={canvasRef} width={1280} height={720} />
       {mobilePlay && <RaceMiniMap view={view} track={track} />}
+      <RaceHud view={view} mySeat={mySeat} />
       <div className="race-feed">
         {(view?.events ?? []).slice(-3).map((e, i) => <span key={i} className={e.kind}>{e.text}</span>)}
       </div>

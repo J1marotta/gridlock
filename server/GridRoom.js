@@ -352,6 +352,7 @@ export class GridRoom extends Room {
       s.pit = car.pitState
       s.needle = car.pitState === 'crew' ? ((car.pitNeedleT % 1 + 1) % 1) : 0
       s.pitProgress = pitProgressOf(car)
+      s.pitPushes = car.pitPushes ?? 0
       s.boosting = nowMs < car.boostUntil
       s.spinning = nowMs < car.spinUntil
       s.hb = Boolean(car.input.handbrake)

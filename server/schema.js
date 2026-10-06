@@ -30,6 +30,7 @@ export const CarState = schema({
   pit: 'string',
   needle: 'number',
   pitProgress: 'number',
+  pitPushes: 'number',
   boosting: 'boolean',
   spinning: 'boolean',
   shielding: 'boolean',
