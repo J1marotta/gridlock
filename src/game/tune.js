@@ -9,7 +9,7 @@ export const TUNE_DEFAULTS = {
     oilSpinMs: 1100, hazardLifeMs: 25000, shieldMs: 8000,
   },
   traffic: { count: 3, speed: 100 },
-  pit: { speedLimit: 150, boxHoldMs: 400, crewBaseMs: 1000, perfectMs: 600, okMs: 1600, slowMs: 3000, perfectHalf: 0.06, okHalf: 0.18, needleSpeed: 1.7 },
+  pit: { speedLimit: 150, boxHoldMs: 400, crewBaseMs: 1000, pushMs: 300, perfectMs: 600, okMs: 1600, slowMs: 3000, perfectHalf: 0.06, okHalf: 0.18, needleSpeed: 1.7 },
 }
 
 export const RACE_PRESETS = [
@@ -80,6 +80,7 @@ export const TUNE_META = {
   'pit.speedLimit': { label: 'Pit speed limit', min: 60, max: 400, step: 10 },
   'pit.boxHoldMs': { label: 'Box hold (ms)', min: 0, max: 2000, step: 100 },
   'pit.crewBaseMs': { label: 'Crew base (ms)', min: 0, max: 4000, step: 100 },
+  'pit.pushMs': { label: 'Mash bonus (ms)', min: 0, max: 1000, step: 50 },
   'pit.perfectMs': { label: 'Perfect bonus (ms)', min: 0, max: 2000, step: 100 },
   'pit.okMs': { label: 'Ok bonus (ms)', min: 0, max: 3000, step: 100 },
   'pit.slowMs': { label: 'Slow penalty (ms)', min: 0, max: 6000, step: 100 },

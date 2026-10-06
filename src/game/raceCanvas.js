@@ -530,7 +530,7 @@ function drawPitBar(ctx, car, nowMs) {
   ctx.font = 'bold 12px monospace'
   ctx.textAlign = 'center'
   ctx.globalAlpha = pulse
-  ctx.fillText(`🔧 PITTING… ${Math.round(p * 100)}%`, car.x, y + h + 17)
+  ctx.fillText(`🔧 MASH P! ${Math.round(p * 100)}%`, car.x, y + h + 17)
   ctx.restore()
 }
 

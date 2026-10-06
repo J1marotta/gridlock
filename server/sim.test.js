@@ -225,6 +225,10 @@ describe('gridlock pits and tires', () => {
     expect(me.pitState).toBe('working')
     expect(me.pitTotalMs).toBeGreaterThan(0)
     expect(pitProgressOf(me)).toBe(0)
+    const before = me.pitWorkMs
+    expect(pressPit(race, me)).toBe(true)
+    expect(me.pitPushes).toBe(1)
+    expect(me.pitWorkMs).toBe(before - race.tune.pit.pushMs)
     stepRace(race, 0.05, 50)
     expect(pitProgressOf(me)).toBeGreaterThan(0)
     for (let t = 0; t < 4000 && me.pitState !== 'none'; t += 50) stepRace(race, 0.05, t)
@@ -245,10 +249,12 @@ describe('gridlock pits and tires', () => {
 
   it('does not start service away from the pit lane or with fresh tyres', () => {
     const race = testRace()
-    const [me] = race.cars
+    const [me, npc] = race.cars
     expect(pressPit(race, me)).toBe(false)
     me.x = 300; me.y = 832; me.wear = 0
     expect(pressPit(race, me)).toBe(false)
+    npc.x = 300; npc.y = 832; npc.wear = 120
+    expect(pressPit(race, npc)).toBe(false)
   })
 
   it('worn rubber is slower than fresh', () => {

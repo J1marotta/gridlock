@@ -307,7 +307,7 @@ export default function GridApp() {
       else if (e.code === 'ArrowLeft' || e.code === 'KeyA') k.left = true
       else if (e.code === 'ArrowRight' || e.code === 'KeyD') k.right = true
       else if (e.code === 'Space') { if (!e.repeat) pressSpace() }
-      else if (e.code === 'KeyP') { if (!e.repeat) pressPit() }
+      else if (e.code === 'KeyP') { pressPit() }
       else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { k.hb = true }
       else handled = false
       if (handled) {
@@ -481,7 +481,7 @@ export default function GridApp() {
                 </label>
               </div>
               <p className="dim small">
-                ↑ gas · ↓ brake · ← → steer · Space item · P pit · Shift handbrake · H horn · R rematch · <kbd>~</kbd> live tune panel.
+                ↑ gas · ↓ brake · ← → steer · Space item · P pit (mash!) · Shift handbrake · H horn · R rematch · <kbd>~</kbd> live tune panel.
                 Tires wear — the pit crew runs out when you box. Endpoint: {getColyseusEndpoint()}
               </p>
             </div>
@@ -779,6 +779,7 @@ function RaceCanvas({ view, audio, mySeat, track, mobilePlay }) {
 function TouchControls({ view, onSteer, onAction, onPit, onHb, track }) {
   const car = view?.cars.find(c => c.seat === view.localSeat)
   const canPit = Boolean(track && car && car.pit === 'none' && car.wear >= 10 && inPitZone(track, car.x, car.y))
+  const mashing = car?.pit === 'working'
   const hold = (side, pressed) => e => {
     e.preventDefault()
     if (pressed) e.currentTarget.setPointerCapture?.(e.pointerId)
@@ -795,7 +796,7 @@ function TouchControls({ view, onSteer, onAction, onPit, onHb, track }) {
     <button className="touch-steer" aria-label="Steer right" onPointerDown={hold('right', true)} onPointerUp={hold('right', false)} onPointerCancel={hold('right', false)} onLostPointerCapture={hold('right', false)}>▶</button>
     <button className="touch-action" onClick={onAction} disabled={!car?.item}>{car?.item ? `USE ${ITEM_LABEL[car.item] ?? 'ITEM'}` : 'NO ITEM'}</button>
     <button className="touch-action" aria-label="Handbrake" onPointerDown={holdHb(true)} onPointerUp={holdHb(false)} onPointerCancel={holdHb(false)} onLostPointerCapture={holdHb(false)}>HB</button>
-    <button className="touch-pit" onClick={onPit} disabled={!canPit} aria-label="Pit for fresh tyres">{car?.pit === 'working' ? 'SERVICING…' : canPit ? 'PIT FOR TYRES' : 'PIT'}</button>
+    <button className="touch-pit" onClick={onPit} disabled={!(canPit || mashing)} aria-label="Pit for fresh tyres">{mashing ? 'MASH!' : canPit ? 'PIT FOR TYRES' : 'PIT'}</button>
   </div>
 }
 

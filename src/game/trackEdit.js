@@ -120,17 +120,32 @@ export function clearanceAt(points, halfWidth, x, y) {
 }
 
 export function autoPit(points, halfWidth) {
-  let best = { len: -1, i: 0 }
-  for (let i = 0; i < points.length; i += 1) {
-    const len = Math.sqrt(dist2(points[i], points[(i + 1) % points.length]))
-    if (len > best.len) best = { len, i }
+  // Strongest straight wins: longest window with the best chord/arc ratio,
+  // so the lane sits beside real straightaway instead of a curve tangent.
+  // The center stays on a ribbon point (reachable); only the angle comes
+  // from the chord, keeping the edges parallel to the straight.
+  const n = points.length
+  const k = Math.max(2, Math.round(n / 16))
+  const hop = i => Math.sqrt(dist2(points[((i % n) + n) % n], points[(((i + 1) % n) + n) % n]))
+  let best = null
+  for (let i = 0; i < n; i += 1) {
+    let arc = 0
+    for (let j = i - k; j < i + k; j += 1) arc += hop(j)
+    const a = points[(((i - k) % n) + n) % n]
+    const b = points[(i + k) % n]
+    const chord = Math.sqrt(dist2(a, b))
+    const score = arc * (chord / (arc || 1)) ** 2
+    if (!best || score > best.score + 1e-9) best = { score, i, arc, chord }
   }
-  const a = points[best.i]
-  const b = points[(best.i + 1) % points.length]
-  const dx = (b[0] - a[0]) / (best.len || 1)
-  const dy = (b[1] - a[1]) / (best.len || 1)
-  const mx = (a[0] + b[0]) / 2
-  const my = (a[1] + b[1]) / 2
+  const a = points[(((best.i - k) % n) + n) % n]
+  const b = points[(best.i + k) % n]
+  const chord = Math.sqrt(dist2(a, b)) || 1
+  const dx = (b[0] - a[0]) / chord
+  const dy = (b[1] - a[1]) / chord
+  const m0 = points[best.i]
+  const m1 = points[(best.i + 1) % n]
+  const mx = (m0[0] + m1[0]) / 2
+  const my = (m0[1] + m1[1]) / 2
   const off = halfWidth + 56
   const cands = [
     { x: mx - dy * off, y: my + dx * off },
@@ -148,7 +163,7 @@ export function autoPit(points, halfWidth) {
     pit: {
       cx: Math.round(chosen.x), cy: Math.round(chosen.y),
       angle: Math.atan2(dy, dx),
-      length: Math.round(Math.min(860, best.len + 420)), width: 96,
+      length: Math.round(Math.min(860, best.chord + 200)), width: 96,
     },
     warnings,
   }

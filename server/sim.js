@@ -73,7 +73,7 @@ export function addCar(race, { playerId, name, color, isNpc, seat }) {
     lap: 1, nextGate: 1, looped: false, progress: 0, place: seat + 1, // grid sits in gate 11; opening crossing must not count
     wear: 0, item: '', itemHeldMs: 0,
     boostUntil: 0, spinUntil: 0, spinDir: 1, shieldUntil: 0, lastHonk: -9999,
-    pitState: 'none', pitHoldMs: 0, pitNeedleT: 0, pitWorkMs: 0, pitTotalMs: 0, pitAutoAt: 0, pitGrade: '',
+    pitState: 'none', pitHoldMs: 0, pitNeedleT: 0, pitWorkMs: 0, pitTotalMs: 0, pitPushes: 0, pitAutoAt: 0, pitGrade: '',
     pitArmed: true,
     finished: false, finishTimeMs: 0,
     input: { steer: 0, throttle: 0 },
@@ -544,17 +544,24 @@ export function pitProgressOf(car) {
 }
 
 export function pressPit(race, car) {
-  if (!car || car.finished || car.pitState !== 'none' || car.isNpc) return false
+  if (!car || car.finished) return false
+  if (car.pitState === 'working') {
+    car.pitWorkMs = Math.max(0, car.pitWorkMs - race.tune.pit.pushMs)
+    car.pitPushes += 1
+    return true
+  }
+  if (car.pitState !== 'none' || car.isNpc) return false
   if (!inPitZone(race.track, car.x, car.y) || car.wear < 10) return false
   car.pitState = 'working'
   car.pitGrade = 'SERVICE'
   car.pitWorkMs = Math.max(0, race.tune.pit.crewBaseMs) + 900
   car.pitTotalMs = car.pitWorkMs
+  car.pitPushes = 0
   car.pitArmed = false
   car.pitHoldMs = 0
   car.vx = 0
   car.vy = 0
-  logEvent(race, 'pit', `🔧 ${car.name} pits for fresh tyres`, car.seat)
+  logEvent(race, 'pit', `🔧 ${car.name} pits for fresh tyres — mash P!`, car.seat)
   return true
 }
 

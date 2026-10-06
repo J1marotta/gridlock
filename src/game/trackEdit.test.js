@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  autoPit, finalizeTrack, findPinches, placePitAt, prepareData, rawLength, resampleClosed, segSegDist, smoothClosed, snapToLoop, validateLoop,
+  autoPit, clearanceAt, finalizeTrack, findPinches, placePitAt, prepareData, rawLength, resampleClosed, segSegDist, smoothClosed, snapToLoop, validateLoop,
 } from './trackEdit.js'
 import { makeTrack } from './track.js'
 
@@ -86,6 +86,13 @@ describe('studio geometry', () => {
     expect(pit.cx).toBeLessThanOrEqual(1560)
     expect(pit.cy).toBeGreaterThanOrEqual(40)
     expect(pit.cy).toBeLessThanOrEqual(860)
+  })
+
+  it('auto pit runs parallel to the straight it serves', () => {
+    const pts = roundedRect(800, 450, 900, 500, 120)
+    const { pit } = autoPit(pts, 46)
+    expect(Math.abs(Math.sin(pit.angle))).toBeLessThan(0.08)
+    expect(clearanceAt(pts, 46, pit.cx, pit.cy)).toBeGreaterThan(20)
   })
 
   it('placement tools snap pit and start to the loop', () => {
