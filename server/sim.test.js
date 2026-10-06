@@ -33,6 +33,42 @@ describe('gridlock driving', () => {
     expect(me.angle).toBe(still)
   })
 
+  it('handbrake turns harder, bleeds speed and eats tyres', () => {
+    const mk = () => {
+      const tune = cloneTune()
+      tune.traffic.count = 0
+      const r = createRace(tune)
+      addCar(r, { playerId: 'w', name: 'W', color: '#fff', seat: 0 })
+      const [c] = r.cars
+      c.x = 500; c.y = 748; c.angle = 0
+      c.vx = 250; c.vy = 0
+      r.phase = 'racing'
+      r.now = 0
+      r.raceEndsAt = Number.MAX_SAFE_INTEGER
+      return { r, c }
+    }
+    const grip = mk()
+    const slide = mk()
+    for (let t = 0; t < 1500; t += 50) {
+      grip.c.input = { steer: 1, throttle: 1, handbrake: false }
+      slide.c.input = { steer: 1, throttle: 1, handbrake: true }
+      stepRace(grip.r, 0.05, t)
+      stepRace(slide.r, 0.05, t)
+    }
+    expect(Math.abs(slide.c.angle)).toBeGreaterThan(Math.abs(grip.c.angle))
+    expect(Math.hypot(slide.c.vx, slide.c.vy)).toBeLessThan(Math.hypot(grip.c.vx, grip.c.vy))
+    expect(slide.c.wear).toBeGreaterThan(grip.c.wear)
+  })
+
+  it('handbrake does nothing at a standstill', () => {
+    const race = testRace()
+    const [me] = race.cars
+    const still = me.angle
+    me.input = { steer: 1, throttle: 0, handbrake: true }
+    step(race, 50, 50)
+    expect(me.angle).toBe(still)
+  })
+
   it('grass is slower than asphalt', () => {
     const mk = (x, y) => {
       const tune = cloneTune()

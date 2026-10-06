@@ -115,7 +115,7 @@ export class ColyseusTransport {
   setReady(ready) { this.command(CLIENT_MESSAGE_TYPES.READY, { ready }) }
   updateSettings(s) { this.command(CLIENT_MESSAGE_TYPES.SETTINGS, s) }
   start() { this.command(CLIENT_MESSAGE_TYPES.START) }
-  drive(steer, throttle) { this.command(CLIENT_MESSAGE_TYPES.INPUT, { steer, throttle }) }
+  drive(steer, throttle, handbrake = false) { this.command(CLIENT_MESSAGE_TYPES.INPUT, { steer, throttle, handbrake: Boolean(handbrake) }) }
   useItem() { this.command(CLIENT_MESSAGE_TYPES.USE_ITEM) }
   horn() { this.command(CLIENT_MESSAGE_TYPES.HORN) }
   pitPress() { this.command(CLIENT_MESSAGE_TYPES.PIT_PRESS) }

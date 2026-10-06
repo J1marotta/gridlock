@@ -41,7 +41,8 @@ const payloadValidators = {
   [CLIENT_MESSAGE_TYPES.START]: () => true,
   [CLIENT_MESSAGE_TYPES.INPUT]: p =>
     isNum(p.steer) && p.steer >= -1 && p.steer <= 1 &&
-    isNum(p.throttle) && p.throttle >= -1 && p.throttle <= 1,
+    isNum(p.throttle) && p.throttle >= -1 && p.throttle <= 1 &&
+    (!hasOwn(p, 'handbrake') || typeof p.handbrake === 'boolean'),
   [CLIENT_MESSAGE_TYPES.USE_ITEM]: () => true,
   [CLIENT_MESSAGE_TYPES.HORN]: () => true,
   [CLIENT_MESSAGE_TYPES.PIT_PRESS]: () => true,

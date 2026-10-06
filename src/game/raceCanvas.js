@@ -451,6 +451,15 @@ function drawCar(ctx, view, track, car, nowMs) {
     ctx.arc(0, 0, 24, 0, Math.PI * 2)
     ctx.stroke()
   }
+  if (car.hb && (car.speed ?? 0) > 120) {
+    ctx.strokeStyle = 'rgba(255,255,255,0.65)'
+    ctx.lineWidth = 2
+    for (const sy of [-13, 13]) {
+      ctx.beginPath()
+      ctx.moveTo(-14, sy); ctx.lineTo(-34 - Math.random() * 8, sy)
+      ctx.stroke()
+    }
+  }
   if (car.boosting) {
     ctx.fillStyle = Math.floor(nowMs / 60) % 2 ? '#33ccff' : '#ff9f1c'
     ctx.beginPath()

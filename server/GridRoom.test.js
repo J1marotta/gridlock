@@ -126,4 +126,22 @@ describe('GridRoom race flow', () => {
     expect(cmd(room, host, 'horn', {}).ok).toBe(false)
     expect(room.race.events.some(e => e.kind === 'horn')).toBe(true)
   })
+
+  it('handbrake input reaches the car', () => {
+    resetActiveRoomCodesForTests()
+    seq = 0
+    const room = new GridRoom()
+    room.onCreate({ roomCode: 'GRID4' })
+    const host = mockClient('s-h4')
+    const guest = mockClient('s-g4')
+    room.onJoin(host, { playerName: 'Alf' })
+    room.onJoin(guest, { playerName: 'Bob' })
+    expect(cmd(room, host, 'ready', { ready: true }).ok).toBe(true)
+    expect(cmd(room, guest, 'ready', { ready: true }).ok).toBe(true)
+    expect(cmd(room, host, 'start').ok).toBe(true)
+    room.advanceSimulation(50, room.state.countdownEndsAt + 100)
+    expect(cmd(room, host, 'input', { steer: 0.5, throttle: 1, handbrake: true }).ok).toBe(true)
+    room.advanceSimulation(50, Date.now())
+    expect(room.carOf(room.playerIdBySession.get('s-h4')).input.handbrake).toBe(true)
+  })
 })

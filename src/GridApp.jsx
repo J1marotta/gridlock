@@ -74,7 +74,7 @@ export default function GridApp() {
   const localTuneRef = useRef(null)
   const [localVersion, setLocalVersion] = useState(0)
   const [netTune, setNetTune] = useState(() => cloneTune())
-  const keysRef = useRef({ up: false, down: false, left: false, right: false })
+  const keysRef = useRef({ up: false, down: false, left: false, right: false, hb: false })
   const [mobilePlay, setMobilePlay] = useState(() => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches)
   const lastInputSent = useRef('')
   const lastCount = useRef(-1)
@@ -240,11 +240,12 @@ export default function GridApp() {
     const k = keysRef.current
     const steer = (k.left ? -1 : 0) + (k.right ? 1 : 0)
     const throttle = (k.up ? 1 : 0) + (k.down ? -0.7 : 0)
-    const sig = `${steer},${throttle}`
+    const handbrake = Boolean(k.hb)
+    const sig = `${steer},${throttle},${handbrake ? 1 : 0}`
     if (sig === lastInputSent.current) return
     lastInputSent.current = sig
-    if (mode === 'local') localRef.current?.setInput(steer, throttle)
-    else try { transport.drive(steer, throttle) } catch { /* noop */ }
+    if (mode === 'local') localRef.current?.setInput(steer, throttle, handbrake)
+    else try { transport.drive(steer, throttle, handbrake) } catch { /* noop */ }
   }
 
   function pressSpace() {
@@ -307,6 +308,7 @@ export default function GridApp() {
       else if (e.code === 'ArrowRight' || e.code === 'KeyD') k.right = true
       else if (e.code === 'Space') { if (!e.repeat) pressSpace() }
       else if (e.code === 'KeyP') { if (!e.repeat) pressPit() }
+      else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') { k.hb = true }
       else handled = false
       if (handled) {
         e.preventDefault()
@@ -320,6 +322,7 @@ export default function GridApp() {
       else if (e.code === 'ArrowDown' || e.code === 'KeyS') k.down = false
       else if (e.code === 'ArrowLeft' || e.code === 'KeyA') k.left = false
       else if (e.code === 'ArrowRight' || e.code === 'KeyD') k.right = false
+      else if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') k.hb = false
       else return
       e.preventDefault()
       sendDrive()
@@ -398,7 +401,7 @@ export default function GridApp() {
     localRef.current = new LocalRace({ playerName: name.trim() || 'Racer', tune: localTuneRef.current, trackData })
     localRef.current.soloTrackData = trackData
     localRef.current.start()
-    keysRef.current = { up: false, down: false, left: false, right: false }
+    keysRef.current = { up: false, down: false, left: false, right: false, hb: false }
     lastInputSent.current = ''
     setMode('local')
     setError('')
@@ -427,7 +430,7 @@ export default function GridApp() {
     } else {
       try { await transport.leave() } catch { /* noop */ }
     }
-    keysRef.current = { up: false, down: false, left: false, right: false }
+    keysRef.current = { up: false, down: false, left: false, right: false, hb: false }
     setSnapshot(null); setPrivateState(null); setScreen('menu'); updateRoomLink('')
   }
 
@@ -478,7 +481,7 @@ export default function GridApp() {
                 </label>
               </div>
               <p className="dim small">
-                ↑ gas · ↓ brake · ← → steer · Space item · P pit · H horn · R rematch · <kbd>~</kbd> live tune panel.
+                ↑ gas · ↓ brake · ← → steer · Space item · P pit · Shift handbrake · H horn · R rematch · <kbd>~</kbd> live tune panel.
                 Tires wear — the pit crew runs out when you box. Endpoint: {getColyseusEndpoint()}
               </p>
             </div>
@@ -554,6 +557,7 @@ export default function GridApp() {
                 onSteer={(side, pressed) => { keysRef.current[side] = pressed; sendDrive() }}
                 onAction={pressSpace}
                 onPit={pressPit}
+                onHb={pressed => { keysRef.current.hb = pressed; sendDrive() }}
                 track={activeTrack}
               />}
             </div>
@@ -772,7 +776,7 @@ function RaceCanvas({ view, audio, mySeat, track, mobilePlay }) {
   )
 }
 
-function TouchControls({ view, onSteer, onAction, onPit, track }) {
+function TouchControls({ view, onSteer, onAction, onPit, onHb, track }) {
   const car = view?.cars.find(c => c.seat === view.localSeat)
   const canPit = Boolean(track && car && car.pit === 'none' && car.wear >= 10 && inPitZone(track, car.x, car.y))
   const hold = (side, pressed) => e => {
@@ -780,11 +784,17 @@ function TouchControls({ view, onSteer, onAction, onPit, track }) {
     if (pressed) e.currentTarget.setPointerCapture?.(e.pointerId)
     onSteer(side, pressed)
   }
+  const holdHb = pressed => e => {
+    e.preventDefault()
+    if (pressed) e.currentTarget.setPointerCapture?.(e.pointerId)
+    onHb(pressed)
+  }
   return <div className="touch-controls" aria-label="Driving controls">
     <button className="touch-steer" aria-label="Steer left" onPointerDown={hold('left', true)} onPointerUp={hold('left', false)} onPointerCancel={hold('left', false)} onLostPointerCapture={hold('left', false)}>◀</button>
     <div className="touch-hint">AUTO<br />GAS</div>
     <button className="touch-steer" aria-label="Steer right" onPointerDown={hold('right', true)} onPointerUp={hold('right', false)} onPointerCancel={hold('right', false)} onLostPointerCapture={hold('right', false)}>▶</button>
     <button className="touch-action" onClick={onAction} disabled={!car?.item}>{car?.item ? `USE ${ITEM_LABEL[car.item] ?? 'ITEM'}` : 'NO ITEM'}</button>
+    <button className="touch-action" aria-label="Handbrake" onPointerDown={holdHb(true)} onPointerUp={holdHb(false)} onPointerCancel={holdHb(false)} onLostPointerCapture={holdHb(false)}>HB</button>
     <button className="touch-pit" onClick={onPit} disabled={!canPit} aria-label="Pit for fresh tyres">{car?.pit === 'working' ? 'SERVICING…' : canPit ? 'PIT FOR TYRES' : 'PIT'}</button>
   </div>
 }

@@ -215,14 +215,15 @@ function stepCar(race, car, dt) {
   const dirx = Math.cos(car.angle), diry = Math.sin(car.angle)
   let vf = car.vx * dirx + car.vy * diry
   let vlx = car.vx - dirx * vf, vly = car.vy - diry * vf
+  const hb = Boolean(car.input.handbrake) && vf > 60
 
   if (spinning) {
     car.angle += 9 * car.spinDir * dt
     vf *= 1 - Math.min(1, 3 * dt)
   } else {
     const spdF = clamp(Math.abs(vf) / 120, 0, 1)
-    car.angle += steer * tune.car.steerRate * spdF * (vf >= 0 ? 1 : -1) * dt
-    const drifting = Math.abs(steer) > 0.7 && Math.abs(vf) > 220
+    car.angle += steer * tune.car.steerRate * (hb ? tune.car.handbrakeTurn : 1) * spdF * (vf >= 0 ? 1 : -1) * dt
+    const drifting = (Math.abs(steer) > 0.7 && Math.abs(vf) > 220) || hb
     if (throttle > 0) {
       const a = tune.car.accel * (now < car.boostUntil ? 1.6 : 1)
       vf = Math.min(top, vf + throttle * a * dt)
@@ -231,8 +232,9 @@ function stepCar(race, car, dt) {
     } else {
       vf *= 1 - Math.min(1, 0.6 * dt)
     }
+    if (hb) vf *= 1 - Math.min(1, 1.1 * dt)
     if (vf > top) vf = Math.max(top, vf - tune.car.brakePow * dt)
-    const grip = tune.car.grip * gripMul * (off ? 0.7 : 1) * (drifting ? 0.45 : 1)
+    const grip = tune.car.grip * gripMul * (off ? 0.7 : 1) * (drifting ? 0.45 : 1) * (hb ? 0.35 : 1)
     const decay = Math.exp(-grip * dt)
     vlx *= decay
     vly *= decay

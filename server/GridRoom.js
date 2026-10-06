@@ -193,11 +193,11 @@ export class GridRoom extends Room {
     return seat === undefined ? null : this.race?.cars.find(c => c.seat === seat) ?? null
   }
 
-  drive(player, { steer, throttle }) {
+  drive(player, { steer, throttle, handbrake }) {
     if (!this.race || !['countdown', 'racing'].includes(this.state.phase)) {
       return { ok: false, error: 'wrong-phase', message: 'Not racing' }
     }
-    this.inputByPlayerId.set(player.id, { steer, throttle })
+    this.inputByPlayerId.set(player.id, { steer, throttle, handbrake: Boolean(handbrake) })
     return { ok: true }
   }
 
@@ -354,6 +354,7 @@ export class GridRoom extends Room {
       s.pitProgress = pitProgressOf(car)
       s.boosting = nowMs < car.boostUntil
       s.spinning = nowMs < car.spinUntil
+      s.hb = Boolean(car.input.handbrake)
       s.shielding = nowMs < car.shieldUntil
       s.finished = car.finished
     }
@@ -410,7 +411,7 @@ export class GridRoom extends Room {
     if (!this.race || !['countdown', 'racing'].includes(this.state.phase)) return
     for (const [playerId, input] of this.inputByPlayerId) {
       const car = this.carOf(playerId)
-      if (car && !car.finished) car.input = { steer: input.steer, throttle: input.throttle }
+      if (car && !car.finished) car.input = { steer: input.steer, throttle: input.throttle, handbrake: Boolean(input.handbrake) }
     }
     stepRace(this.race, deltaMs / 1000, nowMs)
     this.state.phase = this.race.phase

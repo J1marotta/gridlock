@@ -1,7 +1,7 @@
 // Live-tunable variables, read by the sim every tick.
 export const TUNE_DEFAULTS = {
   race: { laps: 2, countdownMs: 2400, winnerGraceMs: 15000, timeLimitMs: 300000 },
-  car: { topMul: 1, accel: 205, brakePow: 340, reverseTop: 70, steerRate: 3, grip: 9.4, offTopMul: 0.58, catchupPerPlace: 0.02 },
+  car: { topMul: 1, accel: 205, brakePow: 340, reverseTop: 70, steerRate: 3, grip: 9.4, offTopMul: 0.58, catchupPerPlace: 0.02, handbrakeTurn: 2.2 },
   tires: { wearRate: 0.82, offWearMul: 2, driftWearMul: 1.55, gripLoss: 0.34, topLoss: 0.26, baldCap: 0.5 },
   items: {
     boost: true, oil: true, shield: true,
@@ -58,6 +58,7 @@ export const TUNE_META = {
   'car.steerRate': { label: 'Steering', min: 1, max: 5, step: 0.1 },
   'car.grip': { label: 'Grip', min: 2, max: 14, step: 0.5 },
   'car.offTopMul': { label: 'Grass top ×', min: 0.2, max: 1, step: 0.05 },
+  'car.handbrakeTurn': { label: 'Handbrake turn ×', min: 1, max: 4, step: 0.1 },
   'car.catchupPerPlace': { label: 'Catch-up ×/place', min: 0, max: 0.08, step: 0.005 },
   'tires.wearRate': { label: 'Tire wear /s', min: 0, max: 5, step: 0.05 },
   'tires.driftWearMul': { label: 'Drift wear ×', min: 1, max: 5, step: 0.1 },

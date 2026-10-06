@@ -14,6 +14,8 @@ describe('gridlock protocol', () => {
     expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.VOTE_TRACK, { trackId: 'esses' })).ok).toBe(true)
     expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.TUNE, { patch: { 'car.grip': 5 } })).ok).toBe(true)
     expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.HORN, {})).ok).toBe(true)
+    expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.INPUT, { steer: 0, throttle: 1, handbrake: true })).ok).toBe(true)
+    expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.INPUT, { steer: 0, throttle: 1, handbrake: 'yes' })).ok).toBe(false)
   })
 
   it('rejects out-of-range inputs and unknown tune shapes', () => {

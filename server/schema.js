@@ -33,6 +33,7 @@ export const CarState = schema({
   boosting: 'boolean',
   spinning: 'boolean',
   shielding: 'boolean',
+  hb: 'boolean',
   finished: 'boolean',
 })
 

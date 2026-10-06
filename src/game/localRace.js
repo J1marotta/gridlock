@@ -29,9 +29,9 @@ export class LocalRace {
     startCountdown(this.race, nowMs)
   }
 
-  setInput(steer, throttle) {
+  setInput(steer, throttle, handbrake = false) {
     const car = this.race.cars[0]
-    if (car && !car.finished) car.input = { steer, throttle }
+    if (car && !car.finished) car.input = { steer, throttle, handbrake: Boolean(handbrake) }
   }
 
   pressSpace() {
@@ -79,6 +79,7 @@ export class LocalRace {
         pitProgress: pitProgressOf(c),
         boosting: now < c.boostUntil,
         spinning: now < c.spinUntil, shielding: now < c.shieldUntil, finished: c.finished,
+        hb: Boolean(c.input.handbrake),
       })),
       hazards: r.hazards.map(h => ({ id: h.id, kind: h.kind, x: h.x, y: h.y })),
       vans: r.vans.map(v => ({ id: v.id, x: v.x, y: v.y, angle: v.angle, level: v.level ?? 0, wobbling: now < v.wobbleUntil })),
