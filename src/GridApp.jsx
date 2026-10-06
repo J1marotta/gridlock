@@ -68,7 +68,7 @@ export default function GridApp() {
   const [closedMsg, setClosedMsg] = useState('')
   const [muted, setMuted] = useState(false)
   const [adminOpen, setAdminOpen] = useState(false)
-  const [soloTrack, setSoloTrack] = useState(() => localStorage.getItem('gridlock-track') || 'monza')
+  const [soloTrack, setSoloTrack] = useState(() => localStorage.getItem('gridlock-track') || 'silverstone')
   const [hostTrack, setHostTrack] = useState(DEFAULT_TRACK_ID)
   const localRef = useRef(null)
   const localTuneRef = useRef(null)

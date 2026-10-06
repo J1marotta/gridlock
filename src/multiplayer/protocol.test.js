@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { TRACKS } from '../game/tracks.js'
 import { CLIENT_MESSAGE_TYPES, checkMessageOrder, validateClientMessage } from './protocol.js'
 
 const msg = (type, payload, sequence = 1, roundId = 1) => ({
@@ -24,6 +25,13 @@ describe('gridlock protocol', () => {
     expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.VOTE_PRESET, { presetId: 'chaos' })).ok).toBe(false)
     expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.VOTE_TRACK, { trackId: 'custom' })).ok).toBe(false)
     expect(checkMessageOrder({ roundId: 1, sequence: 2 }, { roundId: 1, lastSequence: 2 }).ok).toBe(false)
+  })
+
+  it('every premade track id is votable', () => {
+    for (const t of TRACKS) {
+      expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.VOTE_TRACK, { trackId: t.id })).ok, t.id).toBe(true)
+    }
+    expect(validateClientMessage(msg(CLIENT_MESSAGE_TYPES.VOTE_TRACK, { trackId: 'atlantis' })).ok).toBe(false)
   })
 
   it('settings requires a known privacy value', () => {

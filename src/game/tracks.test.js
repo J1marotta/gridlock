@@ -10,7 +10,7 @@ describe('track library', () => {
   })
 
   it('every premade validates and has the full kit', () => {
-    expect(TRACKS.length).toBe(5)
+    expect(TRACKS.length).toBe(6)
     for (const t of TRACKS) {
       const res = trackFromData(t.data)
       expect(res.ok, t.id).toBe(true)

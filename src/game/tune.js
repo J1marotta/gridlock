@@ -1,7 +1,7 @@
 // Live-tunable variables, read by the sim every tick.
 export const TUNE_DEFAULTS = {
   race: { laps: 2, countdownMs: 2400, winnerGraceMs: 15000, timeLimitMs: 300000 },
-  car: { topMul: 1, accel: 205, brakePow: 340, reverseTop: 70, steerRate: 3, grip: 9.4, offTopMul: 0.58, catchupPerPlace: 0.02, handbrakeTurn: 2.2 },
+  car: { topMul: 1, accel: 205, brakePow: 340, reverseTop: 70, steerRate: 3, grip: 9.4, offTopMul: 0.58, catchupPerPlace: 0.02, handbrakeTurn: 1.6 },
   tires: { wearRate: 0.82, offWearMul: 2, driftWearMul: 1.55, gripLoss: 0.34, topLoss: 0.26, baldCap: 0.5 },
   items: {
     boost: true, oil: true, shield: true,

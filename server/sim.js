@@ -232,9 +232,9 @@ function stepCar(race, car, dt) {
     } else {
       vf *= 1 - Math.min(1, 0.6 * dt)
     }
-    if (hb) vf *= 1 - Math.min(1, 1.1 * dt)
+    if (hb) vf *= 1 - Math.min(1, 0.7 * dt)
     if (vf > top) vf = Math.max(top, vf - tune.car.brakePow * dt)
-    const grip = tune.car.grip * gripMul * (off ? 0.7 : 1) * (drifting ? 0.45 : 1) * (hb ? 0.35 : 1)
+    const grip = tune.car.grip * gripMul * (off ? 0.7 : 1) * (drifting ? 0.45 : 1) * (hb ? 0.5 : 1)
     const decay = Math.exp(-grip * dt)
     vlx *= decay
     vly *= decay

@@ -1,3 +1,9 @@
+import { TRACKS } from '../game/tracks.js'
+import { RACE_PRESETS } from '../game/tune.js'
+
+const TRACK_IDS = TRACKS.map(t => t.id)
+const PRESET_IDS = RACE_PRESETS.map(p => p.id)
+
 export const PROTOCOL_VERSION = 1
 
 export const CLIENT_MESSAGE_TYPES = Object.freeze({
@@ -46,8 +52,8 @@ const payloadValidators = {
   [CLIENT_MESSAGE_TYPES.USE_ITEM]: () => true,
   [CLIENT_MESSAGE_TYPES.HORN]: () => true,
   [CLIENT_MESSAGE_TYPES.PIT_PRESS]: () => true,
-  [CLIENT_MESSAGE_TYPES.VOTE_PRESET]: p => ['balanced', 'drift', 'turbo'].includes(p.presetId),
-  [CLIENT_MESSAGE_TYPES.VOTE_TRACK]: p => ['switchback', 'speedway', 'hairpin', 'esses'].includes(p.trackId),
+  [CLIENT_MESSAGE_TYPES.VOTE_PRESET]: p => PRESET_IDS.includes(p.presetId),
+  [CLIENT_MESSAGE_TYPES.VOTE_TRACK]: p => TRACK_IDS.includes(p.trackId),
   [CLIENT_MESSAGE_TYPES.TUNE]: p => isObject(p.patch),
   [CLIENT_MESSAGE_TYPES.SET_TRACK]: p => isObject(p.track) && Array.isArray(p.track.points),
   [CLIENT_MESSAGE_TYPES.NEXT_RACE]: () => true,

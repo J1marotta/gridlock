@@ -68,9 +68,26 @@ function premade(id, name, blurb, points, smooth = false, pit = null) {
 
 const MONZA_PIT = { cx: 650, cy: 838, angle: 0, length: 750, width: 96 }
 
+// Silverstone homage: Hamilton straight, Abbey/Farm kinks, Village/Loop,
+// Aintree, Brooklands, Luffield, Woodcote, Copse, Maggotts-Becketts-Chapel,
+// Hanger straight, Stowe, Vale and Club. Sparse control points, smoothed.
+function silverstonePoints() {
+  return [
+    [350, 730], [700, 730], [1050, 728],
+    [1200, 715], [1300, 675], [1345, 615],
+    [1330, 555], [1270, 515], [1190, 520], [1110, 490],
+    [1050, 440], [1000, 390], [920, 355],
+    [830, 340], [750, 355], [680, 335],
+    [560, 320], [440, 325],
+    [350, 345], [300, 400], [282, 470],
+    [302, 528], [285, 590], [305, 665],
+  ]
+}
+
 export const TRACKS = [
   premade('switchback', 'Switchback Park', 'Fast front straight, a tight hairpin and a flowing chicane.', switchbackPoints(), true),
   premade('monza', 'Monza', 'Flat-out straights, T1 and Roggia chicanes, Curva Grande, Lesmos, Ascari, Parabolica.', monzaPoints(), true, MONZA_PIT),
+  premade('silverstone', 'Silverstone', 'Copse, Maggotts-Becketts-Chapel, Hanger straight, Stowe, Vale and Club.', silverstonePoints(), true),
   premade('speedway', 'Speedway', 'Big circle. Flat out, close packs, pits decide it.', circlePoints(800, 450, 390)),
   premade('hairpin', 'Hairpin Alley', 'Stadium straights, brutal hairpins both ends.', roundedRectPoints(800, 450, 1050, 430, 70)),
   premade('esses', 'The Esses', 'Kidney loop — curvature never sits still.', kidneyPoints(800, 450, 335, 0.16, 0.6)),
