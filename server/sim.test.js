@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { cloneTune } from '../src/game/tune.js'
 import { pointAhead } from '../src/game/track.js'
 import {
-  SEAT_COLORS, addCar, catchupMul, createRace, honk, pressPit, startCountdown, stepRace, useItem,
+  SEAT_COLORS, addCar, catchupMul, createRace, honk, pitProgressOf, pressPit, startCountdown, stepRace, useItem,
 } from './sim.js'
 
 function testRace(tunePatch) {
@@ -187,9 +187,24 @@ describe('gridlock pits and tires', () => {
     me.x = 300; me.y = 832; me.vx = 0; me.vy = 0
     expect(pressPit(race, me)).toBe(true)
     expect(me.pitState).toBe('working')
+    expect(me.pitTotalMs).toBeGreaterThan(0)
+    expect(pitProgressOf(me)).toBe(0)
+    stepRace(race, 0.05, 50)
+    expect(pitProgressOf(me)).toBeGreaterThan(0)
     for (let t = 0; t < 4000 && me.pitState !== 'none'; t += 50) stepRace(race, 0.05, t)
     expect(me.wear).toBe(0)
     expect(me.pitState).toBe('none')
+    expect(pitProgressOf(me)).toBe(0)
+  })
+
+  it('pit progress is 0 outside service', () => {
+    const race = testRace()
+    const [me] = race.cars
+    expect(pitProgressOf(me)).toBe(0)
+    expect(pitProgressOf(null)).toBe(0)
+    me.pitState = 'working'
+    me.pitTotalMs = 0
+    expect(pitProgressOf(me)).toBe(0)
   })
 
   it('does not start service away from the pit lane or with fresh tyres', () => {
@@ -252,6 +267,20 @@ describe('gridlock traffic and race flow', () => {
     stepRace(race, 0.05, 100)
     expect(Math.hypot(me.vx, me.vy)).toBeLessThan(200)
     expect(race.events.some(e => e.kind === 'traffic')).toBe(true)
+  })
+
+  it('brushing past a van no longer wrecks the run', () => {
+    const race = testRace()
+    race.tune.traffic.count = 1
+    stepRace(race, 0.05, 50)
+    const [me] = race.cars
+    const [van] = race.vans
+    me.x = van.x + 24; me.y = van.y
+    me.vx = 200; me.vy = 0
+    me.input = { steer: 0, throttle: 0 }
+    stepRace(race, 0.05, 100)
+    expect(race.events.some(e => e.kind === 'traffic')).toBe(false)
+    expect(Math.hypot(me.vx, me.vy)).toBeGreaterThan(150)
   })
 
   it('tune changes apply mid-race', () => {

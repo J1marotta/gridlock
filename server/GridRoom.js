@@ -10,7 +10,7 @@ import {
 import { applyPatch, applyRacePreset, cloneTune, RACE_PRESETS } from '../src/game/tune.js'
 import { DEFAULT_TRACK_ID, getTrack, getTrackData, getTrackVoteOptions, TRACKS } from '../src/game/tracks.js'
 import { trackFromData } from '../src/game/track.js'
-import { SEAT_COLORS, addCar, createRace, honk, pressPit, startCountdown, stepRace, useItem } from './sim.js'
+import { SEAT_COLORS, addCar, createRace, honk, pitProgressOf, pressPit, startCountdown, stepRace, useItem } from './sim.js'
 import { BoxState, CarState, FeedEvent, GridState, HazardState, PlayerState, VanState } from './schema.js'
 import { SERVER_TICK_MS } from './sim.js'
 
@@ -351,6 +351,7 @@ export class GridRoom extends Room {
       s.wear = Math.round(Math.min(100, car.wear))
       s.pit = car.pitState
       s.needle = car.pitState === 'crew' ? ((car.pitNeedleT % 1 + 1) % 1) : 0
+      s.pitProgress = pitProgressOf(car)
       s.boosting = nowMs < car.boostUntil
       s.spinning = nowMs < car.spinUntil
       s.shielding = nowMs < car.shieldUntil

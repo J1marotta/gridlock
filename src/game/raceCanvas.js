@@ -486,25 +486,30 @@ function drawCar(ctx, view, track, car, nowMs) {
     ctx.restore()
   }
   if (car.pit === 'working' && isLocal) {
-    drawPitBar(ctx, car)
+    drawPitBar(ctx, car, nowMs)
   }
 }
 
-function drawPitBar(ctx, car) {
-  const w = 130, h = 14
-  const x = car.x - w / 2, y = car.y - 64
+function drawPitBar(ctx, car, nowMs) {
+  const w = 170, h = 16
+  const x = car.x - w / 2, y = car.y - 70
+  const p = Math.min(1, Math.max(0, car.pitProgress ?? 0))
+  const pulse = 0.7 + 0.3 * Math.sin(nowMs / 180)
   ctx.save()
   ctx.fillStyle = 'rgba(5,5,12,0.85)'
-  ctx.fillRect(x - 2, y - 2, w + 4, h + 22)
-  ctx.strokeStyle = '#fff'
+  ctx.fillRect(x - 3, y - 3, w + 6, h + 26)
+  ctx.strokeStyle = '#ffd23f'
   ctx.lineWidth = 2
-  ctx.strokeRect(x - 2, y - 2, w + 4, h + 22)
-  ctx.fillStyle = 'rgba(34,255,102,0.5)'
+  ctx.strokeRect(x - 3, y - 3, w + 6, h + 26)
+  ctx.fillStyle = 'rgba(255,255,255,0.18)'
   ctx.fillRect(x, y, w, h)
+  ctx.fillStyle = p >= 1 ? '#22ff66' : '#33ccff'
+  ctx.fillRect(x, y, w * p, h)
   ctx.fillStyle = '#fff'
-  ctx.font = 'bold 11px monospace'
+  ctx.font = 'bold 12px monospace'
   ctx.textAlign = 'center'
-  ctx.fillText('CREW WORKING…', car.x, y + h + 15)
+  ctx.globalAlpha = pulse
+  ctx.fillText(`🔧 PITTING… ${Math.round(p * 100)}%`, car.x, y + h + 17)
   ctx.restore()
 }
 

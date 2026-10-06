@@ -29,6 +29,7 @@ export const CarState = schema({
   wear: 'number',
   pit: 'string',
   needle: 'number',
+  pitProgress: 'number',
   boosting: 'boolean',
   spinning: 'boolean',
   shielding: 'boolean',

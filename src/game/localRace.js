@@ -1,5 +1,5 @@
 // Solo mode: the authoritative sim running locally.
-import { SEAT_COLORS, addCar, createRace, honk, pressPit, startCountdown, stepRace, useItem } from '../../server/sim.js'
+import { SEAT_COLORS, addCar, createRace, honk, pitProgressOf, pressPit, startCountdown, stepRace, useItem } from '../../server/sim.js'
 import { trackFromData } from './track.js'
 import { DEFAULT_TRACK_ID, getTrackData } from './tracks.js'
 import { cloneTune } from './tune.js'
@@ -76,6 +76,7 @@ export class LocalRace {
         level: c.level ?? 0,
         wear: Math.round(Math.min(100, c.wear)), pit: c.pitState,
         needle: c.pitState === 'crew' ? ((c.pitNeedleT % 1 + 1) % 1) : 0,
+        pitProgress: pitProgressOf(c),
         boosting: now < c.boostUntil,
         spinning: now < c.spinUntil, shielding: now < c.shieldUntil, finished: c.finished,
       })),

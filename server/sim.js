@@ -8,7 +8,7 @@ import { cloneTune } from '../src/game/tune.js'
 export const SERVER_TICK_MS = 50
 export const BASE_TOP = 340
 export const CAR_R = 11
-export const VAN_R = 15
+export const VAN_HIT_R = 9
 export const SEAT_COLORS = [
   '#ff3355', '#ff9f1c', '#ffee33', '#44ff66',
   '#22dd88', '#33ccff', '#3366ff', '#c26bff',
@@ -73,7 +73,7 @@ export function addCar(race, { playerId, name, color, isNpc, seat }) {
     lap: 1, nextGate: 1, looped: false, progress: 0, place: seat + 1, // grid sits in gate 11; opening crossing must not count
     wear: 0, item: '', itemHeldMs: 0,
     boostUntil: 0, spinUntil: 0, spinDir: 1, shieldUntil: 0, lastHonk: -9999,
-    pitState: 'none', pitHoldMs: 0, pitNeedleT: 0, pitWorkMs: 0, pitAutoAt: 0, pitGrade: '',
+    pitState: 'none', pitHoldMs: 0, pitNeedleT: 0, pitWorkMs: 0, pitTotalMs: 0, pitAutoAt: 0, pitGrade: '',
     pitArmed: true,
     finished: false, finishTimeMs: 0,
     input: { steer: 0, throttle: 0 },
@@ -334,6 +334,7 @@ export function resolvePit(race, car, auto = false) {
   else if (!auto && err <= t.okHalf) { grade = 'ok'; extra = t.okMs }
   car.pitGrade = grade
   car.pitWorkMs = t.crewBaseMs + extra
+  car.pitTotalMs = car.pitWorkMs
   car.pitState = 'working'
 }
 
@@ -355,13 +356,13 @@ function stepVan(race, van, dt) {
   for (const car of race.cars) {
     if (car.finished) continue
     if (car.level !== van.level) continue
-    if (Math.hypot(car.x - van.x, car.y - van.y) < CAR_R + VAN_R) {
+    if (Math.hypot(car.x - van.x, car.y - van.y) < CAR_R + VAN_HIT_R) {
       const nx = (car.x - van.x) / (Math.hypot(car.x - van.x, car.y - van.y) || 1)
       const ny = (car.y - van.y) / (Math.hypot(car.x - van.x, car.y - van.y) || 1)
-      car.x = van.x + nx * (CAR_R + VAN_R)
-      car.y = van.y + ny * (CAR_R + VAN_R)
-      car.vx *= 0.55
-      car.vy *= 0.55
+      car.x = van.x + nx * (CAR_R + VAN_HIT_R)
+      car.y = van.y + ny * (CAR_R + VAN_HIT_R)
+      car.vx *= 0.7
+      car.vy *= 0.7
       van.wobbleUntil = race.now + 1200
       logEvent(race, 'traffic', `🚐 ${car.name} tags traffic!`, car.seat)
     }
@@ -535,12 +536,18 @@ export function stepRace(race, dt, nowMs) {
   }
 }
 
+export function pitProgressOf(car) {
+  if (!car || car.pitState !== 'working' || !(car.pitTotalMs > 0)) return 0
+  return Math.min(1, Math.max(0, 1 - car.pitWorkMs / car.pitTotalMs))
+}
+
 export function pressPit(race, car) {
   if (!car || car.finished || car.pitState !== 'none' || car.isNpc) return false
   if (!inPitZone(race.track, car.x, car.y) || car.wear < 10) return false
   car.pitState = 'working'
   car.pitGrade = 'SERVICE'
   car.pitWorkMs = Math.max(0, race.tune.pit.crewBaseMs) + 900
+  car.pitTotalMs = car.pitWorkMs
   car.pitArmed = false
   car.pitHoldMs = 0
   car.vx = 0
