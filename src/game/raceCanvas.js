@@ -373,6 +373,18 @@ function drawCar(ctx, view, track, car, nowMs) {
     ctx.strokeText(ITEM_GLYPH[car.item] ?? '?', 24, -26)
     ctx.fillText(ITEM_GLYPH[car.item] ?? '?', 24, -26)
   }
+  if (isLocal) {
+    const bob = Math.sin(nowMs / 240) * 4
+    ctx.fillStyle = '#ffd23f'
+    ctx.strokeStyle = 'rgba(0,0,0,0.85)'
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.moveTo(0, -58 + bob); ctx.lineTo(-11, -76 + bob); ctx.lineTo(11, -76 + bob)
+    ctx.closePath(); ctx.fill(); ctx.stroke()
+    ctx.fillStyle = '#101018'
+    ctx.font = 'bold 11px monospace'
+    ctx.fillText('YOU', 0, -80 + bob)
+  }
   ctx.rotate(car.angle + (car.spinning ? Math.sin(nowMs / 90) * 0.9 : 0))
   ctx.fillStyle = 'rgba(0,0,0,0.35)'
   ctx.fillRect(-15, -9, 31, 21)
