@@ -1,4 +1,4 @@
-import { WORLD_H, WORLD_W, buildDecor, closestOnTrack } from './track.js'
+import { WORLD_H, WORLD_W, buildDecor, closestOnTrack, inPitZone } from './track.js'
 import { DEFAULT_TRACK_ID, getTrack } from './tracks.js'
 import { SEAT_COLORS } from '../../server/sim.js'
 
@@ -353,7 +353,7 @@ function drawVans(ctx, view, nowMs, onlyBridge) {
   }
 }
 
-function drawCar(ctx, view, track, car, nowMs) {
+export function drawCar(ctx, view, track, car, nowMs) {
   const isLocal = car.seat === view?.localSeat
   const color = SEAT_COLORS[(car.colorIndex ?? car.seat) % SEAT_COLORS.length]
   ctx.save()
@@ -373,7 +373,7 @@ function drawCar(ctx, view, track, car, nowMs) {
     ctx.strokeText(ITEM_GLYPH[car.item] ?? '?', 24, -26)
     ctx.fillText(ITEM_GLYPH[car.item] ?? '?', 24, -26)
   }
-  if (isLocal) {
+  if (isLocal && car.pit === 'none') {
     const bob = Math.sin(nowMs / 240) * 4
     ctx.fillStyle = '#ffd23f'
     ctx.strokeStyle = 'rgba(0,0,0,0.85)'
@@ -509,10 +509,39 @@ function drawCar(ctx, view, track, car, nowMs) {
   if (car.pit === 'working' && isLocal) {
     drawPitBar(ctx, car, nowMs)
   }
+  if (isLocal && view?.phase === 'racing' && car.pit === 'none' && (car.wear ?? 0) >= 10 && track && inPitZone(track, car.x, car.y)) {
+    const pulse = 0.6 + 0.4 * Math.sin(nowMs / 160)
+    ctx.save()
+    ctx.globalAlpha = pulse
+    ctx.fillStyle = '#fff'
+    ctx.font = 'bold 15px monospace'
+    ctx.textAlign = 'center'
+    ctx.fillText('PRESS', car.x - 26, car.y - 92)
+    drawKeyCap(ctx, car.x + 24, car.y - 98, 'Z', false)
+    ctx.restore()
+  }
 }
 
 let lastPitPushes = 0
 let keyDepressedUntil = 0
+
+export function drawKeyCap(ctx, cx, cy, label, depressed) {
+  const kw = 40, kh = 30
+  const dy = depressed ? 3 : 0
+  ctx.save()
+  ctx.fillStyle = depressed ? '#44ff66' : '#23232e'
+  ctx.strokeStyle = '#fff'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.roundRect(cx - kw / 2, cy - kh / 2 + dy, kw, kh, 7)
+  ctx.fill()
+  ctx.stroke()
+  ctx.fillStyle = depressed ? '#06130a' : '#fff'
+  ctx.font = '900 19px monospace'
+  ctx.textAlign = 'center'
+  ctx.fillText(label, cx, cy + 7 + dy)
+  ctx.restore()
+}
 
 function drawPitBar(ctx, car, nowMs) {
   const w = 170, h = 16
@@ -542,19 +571,7 @@ function drawPitBar(ctx, car, nowMs) {
   ctx.globalAlpha = pulse
   ctx.fillText(`🔧 MASH ${Math.round(p * 100)}%`, car.x, y + h + 17)
   ctx.globalAlpha = 1
-  // on-screen keycap that bottoms out with every mash
-  const kw = 46, kh = 32
-  const kx = car.x - kw / 2, ky = y + h + 24 + (depressed ? 4 : 0)
-  ctx.fillStyle = depressed ? '#44ff66' : '#23232e'
-  ctx.strokeStyle = '#fff'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.roundRect(kx, ky, kw, kh, 7)
-  ctx.fill()
-  ctx.stroke()
-  ctx.fillStyle = depressed ? '#06130a' : '#fff'
-  ctx.font = '900 20px monospace'
-  ctx.fillText('Z', car.x, ky + 24)
+  drawKeyCap(ctx, car.x, y + h + 40, 'Z', depressed)
   ctx.restore()
 }
 

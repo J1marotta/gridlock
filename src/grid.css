@@ -33,6 +33,12 @@
 .hud-badge { position: absolute; z-index: 3; right: 10px; bottom: 8px; text-align: right; pointer-events: none; text-shadow: 2px 2px 0 #000; }
 .hud-big { display: block; font-size: 44px; font-weight: 900; color: #fff; line-height: 1; }
 .hud-sub { font-size: 14px; font-weight: 800; color: #ffd23f; }
+.hud-deny {
+  position: absolute; z-index: 4; left: 50%; bottom: 44px; transform: translateX(-50%);
+  background: rgba(5, 5, 12, 0.85); border: 2px solid #ff5555; border-radius: 10px;
+  color: #ffb3b3; font-weight: 900; font-size: 15px; letter-spacing: 1px;
+  padding: 8px 16px; pointer-events: none; white-space: nowrap;
+}
 
 /* ---- layout/cards (shared vocabulary with nitro) ---- */
 .grid-layout { max-width: 1380px; margin: 0 auto; display: grid; gap: 10px; }

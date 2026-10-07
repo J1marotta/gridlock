@@ -260,11 +260,34 @@ export default function GridApp() {
     }
   }
 
+  const [pitDeny, setPitDeny] = useState('')
+  const denyTimer = useRef(0)
+  function denyPit(msg) {
+    setPitDeny(msg)
+    clearTimeout(denyTimer.current)
+    denyTimer.current = setTimeout(() => setPitDeny(''), 1400)
+  }
+
   function pressPit() {
-    const started = mode === 'local'
-      ? localRef.current?.pitPress()
-      : (() => { try { transport.pitPress(); return true } catch { return false } })()
-    if (started) audioRef.current.pit()
+    audioRef.current.ensure()
+    if (mode === 'local') {
+      const car = localRef.current?.race.cars[0]
+      const r = localRef.current?.race
+      if (!car || r?.phase !== 'racing') return
+      if (car.pitState === 'working' || car.pitState === 'none') {
+        if (car.pitState === 'none') {
+          if (!inPitZone(r.track, car.x, car.y)) { denyPit('GET IN THE PIT LANE'); return }
+          if (car.wear < 10) { denyPit('TYRES STILL FRESH'); return }
+        }
+        if (localRef.current?.pitPress()) audioRef.current.pit()
+      }
+    } else if (localCar && view?.phase === 'racing') {
+      const okZone = localCar.pit !== 'none' || !netTrack || inPitZone(netTrack, localCar.x, localCar.y)
+      const okWear = localCar.pit !== 'none' || (localCar.wear ?? 0) >= 10
+      if (!okZone) { denyPit('GET IN THE PIT LANE'); return }
+      if (!okWear) { denyPit('TYRES STILL FRESH'); return }
+      try { transport.pitPress(); audioRef.current.pit() } catch { /* noop */ }
+    }
   }
 
   function honkHorn() {
@@ -550,7 +573,7 @@ export default function GridApp() {
             <div className="race-screen">
               <RaceCanvas
                 view={view} audio={audioRef.current} mySeat={mySeat} mobilePlay={mobilePlay}
-                track={activeTrack}
+                track={activeTrack} pitDeny={pitDeny}
               />
               {mobilePlay && screen !== 'finished' && <TouchControls
                 view={view}
@@ -745,7 +768,7 @@ function RaceHud({ view, mySeat }) {
   </>)
 }
 
-function RaceCanvas({ view, audio, mySeat, track, mobilePlay }) {
+function RaceCanvas({ view, audio, mySeat, track, mobilePlay, pitDeny }) {
   const canvasRef = useRef(null)
   const viewRef = useRef(view)
   viewRef.current = view
@@ -781,6 +804,7 @@ function RaceCanvas({ view, audio, mySeat, track, mobilePlay }) {
       <canvas ref={canvasRef} width={1280} height={720} />
       {mobilePlay && <RaceMiniMap view={view} track={track} />}
       <RaceHud view={view} mySeat={mySeat} />
+      {pitDeny && <div className="hud-deny">{pitDeny}</div>}
       <div className="race-feed">
         {(view?.events ?? []).slice(-3).map((e, i) => <span key={i} className={e.kind}>{e.text}</span>)}
       </div>
