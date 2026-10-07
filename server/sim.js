@@ -358,15 +358,23 @@ function stepVan(race, van, dt) {
   for (const car of race.cars) {
     if (car.finished) continue
     if (car.level !== van.level) continue
-    if (Math.hypot(car.x - van.x, car.y - van.y) < CAR_R + VAN_HIT_R) {
-      const nx = (car.x - van.x) / (Math.hypot(car.x - van.x, car.y - van.y) || 1)
-      const ny = (car.y - van.y) / (Math.hypot(car.x - van.x, car.y - van.y) || 1)
+    // Brushes trim speed; only deep center hits shove the car and cost real time.
+    const dx = car.x - van.x, dy = car.y - van.y
+    const d = Math.hypot(dx, dy)
+    if (d >= CAR_R + VAN_HIT_R) continue
+    if (d < CAR_R + 3) {
+      const nx = dx / (d || 1)
+      const ny = dy / (d || 1)
       car.x = van.x + nx * (CAR_R + VAN_HIT_R)
       car.y = van.y + ny * (CAR_R + VAN_HIT_R)
       car.vx *= 0.7
       car.vy *= 0.7
       van.wobbleUntil = race.now + 1200
       logEvent(race, 'traffic', `🚐 ${car.name} tags traffic!`, car.seat)
+    } else {
+      car.vx *= 0.9
+      car.vy *= 0.9
+      van.wobbleUntil = race.now + 1200
     }
   }
 }

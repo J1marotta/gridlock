@@ -747,6 +747,9 @@ function RaceHud({ view, mySeat }) {
     return d > 0 ? `+${(d / 340).toFixed(1)}` : ''
   }
   const me = cars.find(c => c.seat === mySeat)
+  const wear = me ? Math.max(0, 100 - Math.round(me.wear ?? 0)) : 0
+  const tyreState = !me || wear >= 30 ? 'fresh' : wear > 0 ? 'worn' : 'bald'
+  const tyreText = !me ? '' : tyreState === 'fresh' ? 'FRESH RUBBER' : tyreState === 'worn' ? 'WORN — PIT SOON' : 'BALD — PIT NOW!'
   return (<>
     <div className="race-hud-tower" aria-label="Standings">
       {cars.map(c => (
@@ -765,6 +768,15 @@ function RaceHud({ view, mySeat }) {
       <span className="hud-big">P{me?.place ?? '–'}</span>
       <span className="hud-sub">LAP {me?.lap ?? '–'}/{view?.laps ?? 2}</span>
     </div>
+    {me && (
+      <div className="hud-player" aria-label="Your tyres">
+        <div className="hud-player-head"><span>YOU · P{me.place}</span><span>{me.item ? (ITEM_GLYPH[me.item] ?? '?') : ''}{me.shielding ? '🛡' : ''}</span></div>
+        <div className="hud-tyre-label"><span>TYRES</span><span>{wear}%</span></div>
+        <div className="hud-tyre-bar"><div className={`hud-tyre-fill ${tyreState}`} style={{ width: `${wear}%` }} /></div>
+        <div className={`hud-tyre-state ${tyreState}`}>{tyreText}</div>
+        <div className="hud-player-foot"><span>SPD {Math.round(me.speed ?? 0)}</span><span>{me.pit !== 'none' && me.pit ? '🔧 PITTING' : ''}</span></div>
+      </div>
+    )}
   </>)
 }
 

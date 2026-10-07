@@ -311,7 +311,23 @@ describe('gridlock traffic and race flow', () => {
     expect(race.events.some(e => e.kind === 'traffic')).toBe(true)
   })
 
-  it('brushing past a van no longer wrecks the run', () => {
+  it('rubbing a van only trims speed', () => {
+    const race = testRace()
+    race.tune.traffic.count = 1
+    stepRace(race, 0.05, 50)
+    const [me] = race.cars
+    const [van] = race.vans
+    me.x = van.x + 8; me.y = van.y
+    me.vx = 200; me.vy = 0
+    me.input = { steer: 0, throttle: 0 }
+    stepRace(race, 0.05, 100)
+    expect(Math.hypot(me.vx, me.vy)).toBeLessThan(195)
+    expect(Math.hypot(me.vx, me.vy)).toBeGreaterThan(150)
+    expect(me.x - van.x).toBeLessThan(19)
+    expect(race.events.some(e => e.kind === 'traffic')).toBe(false)
+  })
+
+  it('missing a van entirely costs nothing', () => {
     const race = testRace()
     race.tune.traffic.count = 1
     stepRace(race, 0.05, 50)
